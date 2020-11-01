@@ -10,39 +10,45 @@ cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
 __global__ void addKernel(int *c, const int *a, const int *b)
 {
     int ii = blockIdx.x * blockDim.x + threadIdx.x;
-    c[ii] = a[ii] + b[ii];
+    int iterations = 1000;
+    long a2 = 0;
+    long b2 = 0;
+    for (int jj = 0; jj < 1000; jj++) {
+        a2 *= a[ii];
+        b2 *= b[ii];
+    }
+    c[ii] = a2 + b2;
 }
 
-int add_kernel_test()
+int add_kernel_test(int num_adds)
 {
-    int arraySize = 8*1024;
-    int* aa = (int*) _aligned_malloc(arraySize*sizeof(int), 16);
-    int* bb = (int*) _aligned_malloc(arraySize*sizeof(int), 16);
-    int* cc = (int*) _aligned_malloc(arraySize*sizeof(int), 16);
+    int* aa = (int*) _aligned_malloc(num_adds*sizeof(int), 16);
+    int* bb = (int*) _aligned_malloc(num_adds*sizeof(int), 16);
+    int* cc = (int*) _aligned_malloc(num_adds*sizeof(int), 16);
     //int* aa = (int*) malloc(arraySize);
     //int* bb = (int*) malloc(arraySize);
     //int* cc = (int*) malloc(arraySize);
     printf("aa=0x%p\n", aa);
     printf("bb=0x%p\n", bb);
     printf("cc=0x%p\n", cc);
-    printf("arraySize=%i\n", arraySize);
+    printf("arraySize=%i\n", num_adds);
 
-    for (int ii = 0; ii < arraySize; ii++) {
+    for (int ii = 0; ii < num_adds; ii++) {
         aa[ii] = ii;
         bb[ii] = 2 * ii;
     }
 
     // Add vectors in parallel.
-    cudaError_t cudaStatus = addWithCuda(cc, aa, bb, arraySize);
+    cudaError_t cudaStatus = addWithCuda(cc, aa, bb, num_adds);
     if (cudaStatus != cudaSuccess) {
         fprintf(stderr, "addWithCuda failed!");
         return 1;
     }
 
     printf("{%i,%i,%i,%i,..,%i} + {%i,%i,%i,%i,..,%i} = {%i,%i,%i,%i,..,%i}\n",
-           aa[0], aa[1], aa[2], aa[3], aa[arraySize-1],
-           bb[0], bb[1], bb[2], bb[3], bb[arraySize-1],
-           cc[0], cc[1], cc[2], cc[3], cc[arraySize-1]);
+           aa[0], aa[1], aa[2], aa[3], aa[num_adds-1],
+           bb[0], bb[1], bb[2], bb[3], bb[num_adds-1],
+           cc[0], cc[1], cc[2], cc[3], cc[num_adds-1]);
 
     // cudaDeviceReset must be called before exiting in order for profiling and
     // tracing tools such as Nsight and Visual Profiler to show complete traces.
