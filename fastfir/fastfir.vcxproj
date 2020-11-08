@@ -87,12 +87,14 @@
     <ClInclude Include="FastFirCPU.h" />
     <ClInclude Include="ImpulseSource.h" />
     <ClInclude Include="sse_utils.h" />
+    <ClInclude Include="Stopwatch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FastFir.cpp" />
     <ClCompile Include="FastFirCPU.cpp" />
     <ClCompile Include="ImpulseSource.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Stopwatch.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

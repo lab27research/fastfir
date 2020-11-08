@@ -2,6 +2,8 @@
 
 #include <malloc.h>
 
+//Note: This file is WINDOWS only for now!
+
 //Some day I'll have AVX-512
 #define CPU_ALIGNMENT 64
 

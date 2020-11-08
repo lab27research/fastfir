@@ -1,6 +1,7 @@
 #include "FastFirCPU.h"
 #include "ImpulseSource.h"
 #include "sse_utils.h"
+#include "Stopwatch.h"
 
 //Simulation to compare CPU vs GPU implementations for FFT-Based FIR filtering
 //
@@ -29,8 +30,8 @@ int main() {
 	unsigned int samp0 = 100;
 	ImpulseSource is(snr, samp0);
 
-
 	//This is where we need to add test bench
+	Stopwatch sw;
 	int total_runs = 100000;
 	for (int ii = 0; ii < total_runs/buffers_per_call; ii++) {
 
@@ -42,6 +43,7 @@ int main() {
 		//Run algorithm
 		ff1.run(input, output);
 	}
-
-	printf("Main completed.\n");
+	double runtime = sw.getElapsed();
+	printf("Completed in %.9f seconds\n",runtime);
+	printf("Average time per run: %.9f\n", runtime / total_runs);
 }
