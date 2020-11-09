@@ -83,18 +83,22 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="add_kernel.h" />
+    <ClInclude Include="datplot_utils.h" />
     <ClInclude Include="FastFir.h" />
     <ClInclude Include="FastFirCPU.h" />
     <ClInclude Include="ImpulseSource.h" />
     <ClInclude Include="sse_utils.h" />
     <ClInclude Include="Stopwatch.h" />
+    <ClInclude Include="test_benches.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FastFir.cpp" />
     <ClCompile Include="FastFirCPU.cpp" />
     <ClCompile Include="ImpulseSource.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="datplot_utils.cpp" />
     <ClCompile Include="Stopwatch.cpp" />
+    <ClCompile Include="test_benches.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
