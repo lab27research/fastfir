@@ -1,7 +1,11 @@
 #pragma once
 
+#include "FastFirCPU1.h"
 #include "FastFir.h"
+#include "datplot_utils.h"
 #include <vector>
+
+void test_reference_design();
 
 //Test compares results from passed FastFir to reference FastFirCPU1 (time-domain CPU version)
 void validate_FastFir(FastFir* ff);

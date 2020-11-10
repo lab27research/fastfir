@@ -1,8 +1,10 @@
-#include "FastFirCPU.h"
+#include "FastFirCPU1.h"
+#include "FastFirCPU2.h"
 #include "ImpulseSource.h"
 #include "sse_utils.h"
 #include "Stopwatch.h"
 #include "datplot_utils.h"
+#include "test_benches.h"
 
 //Simulation to compare CPU vs GPU implementations for FFT-Based FIR filtering
 //
@@ -12,6 +14,10 @@
 //
 
 int main() {
+	test_reference_design();
+}
+
+void test() {
 	int buffers_per_call = 10;
 	int input_samps = 1024;
 	int mask_samps = 256;
@@ -24,7 +30,7 @@ int main() {
 	ALIGNED_MALLOC(output, 2 * output_samps * buffers_per_call * sizeof(float));
 
 	//Create CPU-Based FIR Filter
-	FastFirCPU ff1(mask, mask_samps, input_samps, buffers_per_call);
+	FastFirCPU2 ff1(mask, mask_samps, input_samps, buffers_per_call, false);
 
 	//Create input source
 	double snr = 10;

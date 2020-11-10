@@ -1,11 +1,11 @@
-#include "FastFirCPU.h"
+#include "FastFirCPU2.h"
 #include "sse_utils.h"
 
 #include <string.h>
 #include <stdio.h>
 
-FastFirCPU::FastFirCPU(float* mask, int mask_samps, int input_samps, int buffers_per_call)
-	:FastFir(mask, mask_samps, input_samps, buffers_per_call)
+FastFirCPU2::FastFirCPU2(float* mask, int mask_samps, int input_samps, int buffers_per_call, bool contiguous)
+	:FastFir(mask, mask_samps, input_samps, buffers_per_call, contiguous)
 {
 
 	//Allocate input/output buffer and mask fft buffer
@@ -25,7 +25,7 @@ FastFirCPU::FastFirCPU(float* mask, int mask_samps, int input_samps, int buffers
 
 }
 
-FastFirCPU::~FastFirCPU()
+FastFirCPU2::~FastFirCPU2()
 {
 
 	//Destroy all FFTW plans
@@ -38,7 +38,7 @@ FastFirCPU::~FastFirCPU()
 
 }
 
-void FastFirCPU::run(float* input, float* output)
+void FastFirCPU2::run(float* input, float* output)
 {
 
 	for (int ii = 0; ii < buffers_per_call_; ii++) {

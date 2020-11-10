@@ -3,22 +3,32 @@
 #include <cmath>
 #include <stdio.h>
 
-FastFir::FastFir(float* mask, int mask_samps, int input_samps, int buffers_per_call)
+FastFir::FastFir(float* mask, int mask_samps, int input_samps, int buffers_per_call, bool contiguous)
 {
 
 	//Store off input/mask/output parameters
 	mask_samps_ = mask_samps;
 	input_samps_ = input_samps;
-	output_samps_ = FastFir::getOutputSamps(mask_samps, input_samps);
 	buffers_per_call_ = buffers_per_call;
+	contiguous_ = contiguous;
 
 	//Choose an FFT Size equal to next power of 2
-	fft_size_ = input_samps + mask_samps - 1;
+	fft_size_ = FastFir::getFFTSize(mask_samps, input_samps);
 }
 
 FastFir::~FastFir()
 {
 	//Nothing for now
+}
+
+int FastFir::getTotalOutputSamps()
+{
+	if (!contiguous_) {
+		return buffers_per_call_ * FastFir::getOutputSamps(input_samps_, mask_samps_);
+	}
+	else {
+		return FastFir::getOutputSamps(buffers_per_call_ * input_samps_, mask_samps_);
+	}
 }
 
 void FastFir::run(float* input, float* output)
@@ -42,7 +52,7 @@ int FastFir::getFFTSize(int mask_samps, int input_samps)
 
 int FastFir::getOutputSamps(int mask_samps, int input_samps)
 {
-	return input_samps - mask_samps + 1;
+	return input_samps + mask_samps - 1;
 }
 
 double FastFir::getTimeDomainFLOPs(int mask_samps, int input_samps)
