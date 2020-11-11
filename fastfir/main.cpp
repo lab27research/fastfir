@@ -5,6 +5,7 @@
 #include "Stopwatch.h"
 #include "datplot_utils.h"
 #include "test_benches.h"
+#include "noise_utils.h"
 
 //Simulation to compare CPU vs GPU implementations for FFT-Based FIR filtering
 //
@@ -14,7 +15,8 @@
 //
 
 int main() {
-	test_reference_design();
+	//test_reference_design();
+	validate<FastFirCPU1, FastFirCPU2>();
 }
 
 void test() {

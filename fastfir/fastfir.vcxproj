@@ -90,6 +90,7 @@
     <ClInclude Include="FastFirCPU1.h" />
     <ClInclude Include="FastFirCPU2.h" />
     <ClInclude Include="ImpulseSource.h" />
+    <ClInclude Include="noise_utils.h" />
     <ClInclude Include="sse_utils.h" />
     <ClInclude Include="Stopwatch.h" />
     <ClInclude Include="test_benches.h" />
@@ -101,6 +102,7 @@
     <ClCompile Include="ImpulseSource.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="datplot_utils.cpp" />
+    <ClCompile Include="noise_utils.cpp" />
     <ClCompile Include="Stopwatch.cpp" />
     <ClCompile Include="test_benches.cpp" />
   </ItemGroup>

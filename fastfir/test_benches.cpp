@@ -1,4 +1,14 @@
 #include "test_benches.h"
+#include "sse_utils.h"
+#include "noise_utils.h"
+
+void test_generate_wgn_cf() {
+	const int output_samps = 1000;
+	float* output;
+	ALIGNED_MALLOC(output, 2 * output_samps * sizeof(float));
+	generate_wgn_cf(0.5, 0.1, output, output_samps);
+	datplot_write_cf("noise.csv", output, output_samps, 0, 1);
+}
 
 void test_reference_design()
 {
@@ -20,11 +30,6 @@ void test_reference_design()
 
 }
 
-void validate_FastFir(FastFir* ff)
-{
-}
-
 void explore_FastFir(FastFir* ff, std::vector<int> mask_sizes, std::vector<int> input_sizes, std::vector<int> buffers_per_call)
 {
-
 }
