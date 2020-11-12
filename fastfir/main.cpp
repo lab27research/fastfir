@@ -1,11 +1,10 @@
 #include "FastFirCPU1.h"
 #include "FastFirCPU2.h"
 #include "ImpulseSource.h"
-#include "sse_utils.h"
+#include "math_utils.h"
 #include "Stopwatch.h"
 #include "datplot_utils.h"
 #include "test_benches.h"
-#include "noise_utils.h"
 
 //Simulation to compare CPU vs GPU implementations for FFT-Based FIR filtering
 //
@@ -15,8 +14,8 @@
 //
 
 int main() {
-	//test_reference_design();
-	validate<FastFirCPU1, FastFirCPU2>();
+	test_reference_design();
+	//validate<FastFirCPU1, FastFirCPU2>();
 }
 
 void test() {

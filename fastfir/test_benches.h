@@ -47,10 +47,13 @@ void validate() {
 	for (int ii = 0; ii < ff1.getTotalOutputSamps(); ii++) {
 		float aa = output1[2 * ii];
 		float bb = output1[2 * ii + 1];
-		float cc = output2[2 * ii];
-		float dd = output2[2 * ii + 1];
-		accum1 +=
+		float cc = aa - output2[2 * ii];
+		float dd = bb - output2[2 * ii + 1];
+		//Accumulate energy from first output
+		accum1 += sqrt(aa * aa + bb * bb);
+		accum2 += sqrt(cc * cc + dd * dd);
 	}
+	printf("Non-contiguous SNR: %f\n", 10.0 * log10(accum1 / accum2));
 
 	////Run for contiguous ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 }

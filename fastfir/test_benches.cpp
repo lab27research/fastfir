@@ -1,6 +1,5 @@
 #include "test_benches.h"
-#include "sse_utils.h"
-#include "noise_utils.h"
+#include "math_utils.h"
 
 void test_generate_wgn_cf() {
 	const int output_samps = 1000;
