@@ -15,9 +15,6 @@ public:
 	void run(float* input, float* output);
 
 private:
-	float* io_buffer_;
 	float* mask_buffer_;
-	fftwf_plan fwd_plan_;
-	fftwf_plan rev_plan_;
 
 };

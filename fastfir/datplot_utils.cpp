@@ -4,7 +4,7 @@ void datplot_write_cf(char* filename, float* data, int data_samps, double xstart
 {
 	FILE* fid = fopen(filename, "w");
 
-	fprintf(fid, "time,real,imag,mag,phase\n");
+	fprintf(fid, "index,time,real,imag,mag,phase\n");
 
 	for (int ii = 0; ii < data_samps; ii++) {
 		double time = xstart + ii * xdelta;
@@ -18,7 +18,8 @@ void datplot_write_cf(char* filename, float* data, int data_samps, double xstart
 		else {
 			phase = atan2(imag, real);
 		}
-		fprintf(fid, "%.16e", time);
+		fprintf(fid, "%i", ii);
+		fprintf(fid, ",%.16e", time);
 		fprintf(fid, ",%.16e", real);
 		fprintf(fid, ",%.16e", imag);
 		fprintf(fid, ",%.16e", mag);

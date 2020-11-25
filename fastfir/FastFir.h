@@ -8,6 +8,7 @@ public:
 	FastFir(float* mask, int mask_samps, int input_samps, int buffers_per_call, bool contiguous);
 	~FastFir();
 	//Returns the total output samps given constructor parameters
+	// (includes buffers_per_call and contiguous settings)
 	int getTotalOutputSamps();
 
 	//Implementation must process "buffers_per_call" sets of size "input_samps" that are
@@ -31,11 +32,19 @@ public:
 	// contiguous=False --> Total outputs placed in output array: BPC * ( (M-1) + (N* + M - 1) + (M-1) ) = BPC*(N + M - 1)
 	virtual void run(float* input, float* output);
 
-	//Returns the fft size use for each processing buffer nextpow2(N+M-1)
-	static int getFFTSize(int mask_samps, int input_samps);
+	//Other common utilities
+
+	//Returns the output samps for each no-transient buffer (N-M+1)
+	static int getOutputSampsNoTransient(int mask_samps, int input_samps);
+
+	//Returns the output samps for each one-sided transient buffer (N)
+	static int getOutputSamps1Sided(int mask_samps, int input_samps);
 
 	//Returns the output samps for each two-sided transient buffer (N+M-1)
-	static int getOutputSamps(int mask_samps, int input_samps);
+	static int getOutputSamps2Sided(int mask_samps, int input_samps);
+
+	//Returns the next power of two greater than or equal to getOutputSamps
+	static int getFFTSize(int mask_samps, int input_samps);
 
 	//Returns the FLOPs per buffer for the two-sided time domain implementation
 	static double getTimeDomainFLOPs(int mask_samps, int input_samps);
@@ -44,12 +53,11 @@ public:
 	static double getFreqDomainFLOPs(int mask_samps, int input_samps);
 
 protected:
+	//Constructor parameters
 	int mask_samps_;
 	int input_samps_;
 	int buffers_per_call_;
 	bool contiguous_;
-	int fft_size_;
-	int output_samps_;
 };
 
 

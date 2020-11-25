@@ -11,9 +11,9 @@ FastFirCPU1::FastFirCPU1(float* mask, int mask_samps, int input_samps, int buffe
 	ALIGNED_MALLOC(mask_buffer_, 2 * mask_samps_ * sizeof(float));
 
 	//Reverse mask in memory (we are performing convolution)
-	for (int ii = 0; ii < mask_samps; ii++) {
-		mask_buffer_[2 * ii] = mask[2 * (mask_samps - 1 - ii)];
-		mask_buffer_[2 * ii + 1] = mask[2 * (mask_samps - 1 - ii) + 1];
+	for (int ii = 0; ii < mask_samps_; ii++) {
+		mask_buffer_[2 * ii] = mask[2 * (mask_samps_ - 1 - ii)];
+		mask_buffer_[2 * ii + 1] = mask[2 * (mask_samps_ - 1 - ii) + 1];
 	}
 
 }

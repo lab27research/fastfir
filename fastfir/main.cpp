@@ -13,16 +13,23 @@
 //
 //
 
+#include "add_kernel.h"
 int main() {
-	test_reference_design();
-	//validate<FastFirCPU1, FastFirCPU2>();
+
+	//Write output files to verify test case
+	unit_test<FastFirCPU1>("input1.csv","mask1.csv","output1.csv");
+	unit_test<FastFirCPU2>("input2.csv","mask2.csv","output2.csv");
+
+	//Generates random inputs, tests each implementation,
+	// quantifies differences
+	validate<FastFirCPU1, FastFirCPU2>(256,1024,9);
 }
 
 void test() {
 	int buffers_per_call = 10;
 	int input_samps = 1024;
 	int mask_samps = 256;
-	int output_samps = FastFir::getOutputSamps(mask_samps, input_samps);
+	int output_samps = FastFir::getOutputSamps2Sided(mask_samps, input_samps);
 	float* input;
 	float* mask;
 	float* output;
