@@ -7,5 +7,9 @@ int getMaxThreadsPerBlock(int gpu_index) {
 }
 
 int getNumBlocks(int tpb, int total_threads) {
-    return total_threads / tpb;
+    int num_blocks = total_threads / tpb;
+    if (num_blocks * tpb < total_threads) {
+        num_blocks += 1;
+    }
+    return num_blocks;
 }
