@@ -35,9 +35,9 @@ void unit_test(string input_csv, string mask_csv, string output_csv)
     ff.run(input, output);
 
     //Write to datplot files
-    datplot_write_cf((char*) input_csv.c_str(), input, input_samps, 0, 1);
-    datplot_write_cf((char*) mask_csv.c_str(), mask, mask_samps, 0, 1);
-    datplot_write_cf((char*) output_csv.c_str(), output, output_samps, 0, 1);
+    datplot_write_cf((char*)input_csv.c_str(), input, input_samps, 0, 1);
+    datplot_write_cf((char*)mask_csv.c_str(), mask, mask_samps, 0, 1);
+    datplot_write_cf((char*)output_csv.c_str(), output, output_samps, 0, 1);
 
 }
 
@@ -65,7 +65,7 @@ void validate(int mask_samps, int input_samps, int buffers_per_call) {
 
     //Generate input and mask, create filters for both contiguous and non-contiguous
     generate_wgn_cf(0.5, 0.1, mask, mask_samps);
-    generate_wgn_cf(0.5, 0.1, input, input_samps*buffers_per_call);
+    generate_wgn_cf(0.5, 0.1, input, input_samps * buffers_per_call);
     ff_type1 ff1(mask, mask_samps, input_samps, buffers_per_call, false);
     ff_type2 ff2(mask, mask_samps, input_samps, buffers_per_call, false);
     ff_type1 ff3(mask, mask_samps, input_samps, buffers_per_call, true);

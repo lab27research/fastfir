@@ -99,7 +99,8 @@ void FastFirCPU2::run(float* input, float* output)
             //Move by full 2-sided transient
             out_ptr += 2 * output_samps_2sided;
 
-        }else {
+        }
+        else {
             if (ii == 0) {
                 //For first buffer simply write entire result to memory
                 memcpy(out_ptr, io_buffer_, 2 * output_samps_2sided * sizeof(float));
@@ -119,8 +120,8 @@ void FastFirCPU2::run(float* input, float* output)
 
                 //Set the rest
                 memcpy(&out_ptr[2 * left_transient_samps],
-                    &io_buffer_[2*left_transient_samps],
-                    2*non_left_transient_samps*sizeof(float));
+                       &io_buffer_[2 * left_transient_samps],
+                       2 * non_left_transient_samps * sizeof(float));
 
                 //Move by right transient of previous buffer and full
                 // overlap samps for current buffer
