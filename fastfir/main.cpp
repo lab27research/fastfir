@@ -1,5 +1,6 @@
 #include "FastFirCPU1.h"
 #include "FastFirCPU2.h"
+#include "FastFirGPU1.h"
 #include "ImpulseSource.h"
 #include "math_utils.h"
 #include "Stopwatch.h"
@@ -23,6 +24,8 @@ int main() {
     //Generates random inputs, tests each implementation,
     // quantifies differences
     validate<FastFirCPU1, FastFirCPU2>(256, 1024, 9);
+    validate<FastFirCPU2, FastFirGPU1>(256, 1024, 9);
+
 }
 
 void test() {

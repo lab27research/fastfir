@@ -66,6 +66,7 @@ void validate(int mask_samps, int input_samps, int buffers_per_call) {
     //Generate input and mask, create filters for both contiguous and non-contiguous
     generate_wgn_cf(0.5, 0.1, mask, mask_samps);
     generate_wgn_cf(0.5, 0.1, input, input_samps * buffers_per_call);
+
     ff_type1 ff1(mask, mask_samps, input_samps, buffers_per_call, false);
     ff_type2 ff2(mask, mask_samps, input_samps, buffers_per_call, false);
     ff_type1 ff3(mask, mask_samps, input_samps, buffers_per_call, true);

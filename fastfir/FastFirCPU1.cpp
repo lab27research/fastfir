@@ -4,7 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
-FastFirCPU1::FastFirCPU1(float* mask, int mask_samps, int input_samps, int buffers_per_call, bool contiguous)
+FastFirCPU1::FastFirCPU1(float* mask, int mask_samps, int input_samps,
+                         int buffers_per_call, bool contiguous)
     :FastFir(mask, mask_samps, input_samps, buffers_per_call, contiguous)
 {
     //Allocate mask buffer and copy in mask data

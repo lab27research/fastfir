@@ -27,5 +27,7 @@ void datplot_write_cf(char* filename, float* data, int data_samps, double xstart
         fprintf(fid, "\n");
 
     }
+
+    fclose(fid);
 }
 
