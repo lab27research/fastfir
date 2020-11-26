@@ -15,6 +15,8 @@ using namespace std;
 template <class ff_type>
 void unit_test(string input_csv, string mask_csv, string output_csv)
 {
+    printf("Running unit test for %s, outputs at %s/%s/%s\n", typeid(ff_type).name(), input_csv.c_str(), mask_csv.c_str(), output_csv.c_str());
+
     //Create mask/input/output buffers
     const int mask_samps = 2;
     const int input_samps = 4;
@@ -46,6 +48,7 @@ void unit_test(string input_csv, string mask_csv, string output_csv)
 //Prints the SNR of the result 10*log10( pow(res1) / pow(res1-res2) )
 template <class ff_type1, class ff_type2>
 void validate(int mask_samps, int input_samps, int buffers_per_call) {
+    printf("Running validation test %s vs %s...\n", typeid(ff_type1).name(), typeid(ff_type2).name());
 
     //Setup all input/output buffers
     //Note: allocate large enough for both contiguous and non-contiguous
@@ -79,10 +82,10 @@ void validate(int mask_samps, int input_samps, int buffers_per_call) {
     ff4.run(input, output4);
 
     //DEBUG
-    datplot_write_cf("temp1.csv", output1, ff1.getTotalOutputSamps(), 0, 1);
-    datplot_write_cf("temp2.csv", output2, ff2.getTotalOutputSamps(), 0, 1);
-    datplot_write_cf("temp3.csv", output3, ff3.getTotalOutputSamps(), 0, 1);
-    datplot_write_cf("temp4.csv", output4, ff4.getTotalOutputSamps(), 0, 1);
+    //datplot_write_cf("temp1.csv", output1, ff1.getTotalOutputSamps(), 0, 1);
+    //datplot_write_cf("temp2.csv", output2, ff2.getTotalOutputSamps(), 0, 1);
+    //datplot_write_cf("temp3.csv", output3, ff3.getTotalOutputSamps(), 0, 1);
+    //datplot_write_cf("temp4.csv", output4, ff4.getTotalOutputSamps(), 0, 1);
 
     //Compute and print SNR
     double accum1 = 0.0;
@@ -116,4 +119,46 @@ void explore(char* output_csv,
              std::vector<int> mask_sizes,
              std::vector<int> input_sizes,
              std::vector<int> buffers_per_call) {
+}
+
+template<class ff_type>
+double test_performance() {
+    int total_buffers = 1000;
+    int buffers_per_call = 10;
+    int input_samps = 1024;
+    int mask_samps = 256;
+    int output_samps = FastFir::getOutputSamps2Sided(mask_samps, input_samps);
+    float* input;
+    float* flipped_mask;
+    float* output;
+    ALIGNED_MALLOC(flipped_mask, 2 * mask_samps * buffers_per_call * sizeof(float));
+    ALIGNED_MALLOC(input, 2 * input_samps * buffers_per_call * sizeof(float));
+    ALIGNED_MALLOC(output, 2 * output_samps * buffers_per_call * sizeof(float));
+
+    //Populate input and mask (flip and conjugate mask to make this correlation)
+    generate_wgn_cf(0.5, 0.1, input, input_samps);
+    for (int ii = 0; ii < mask_samps; ii++) {
+        flipped_mask[2 * ii] = input[2 * (mask_samps - 1 - ii)];
+        flipped_mask[2 * ii + 1] = -input[2 * (mask_samps - 1 - ii) + 1];
+    }
+
+    //Create FIR Filter
+    ff_type ff1(flipped_mask, mask_samps, input_samps, buffers_per_call, false);
+
+    //This is where we need to add test bench
+    Stopwatch sw;
+    for (int ii = 0; ii < total_buffers / buffers_per_call; ii++) {
+
+        //Run algorithm
+        ff1.run(input, output);
+    }
+    double runtime = sw.getElapsed();
+    printf("Completed in %.9f seconds\n", runtime);
+    printf("Average time per run: %.9f\n", runtime / total_buffers);
+
+    datplot_write_cf("peak1.csv", flipped_mask, mask_samps, 0, 1);
+    datplot_write_cf("peak2.csv", input, input_samps, 0, 1);
+    datplot_write_cf("peak3.csv", output, ff1.getTotalOutputSamps(), 0, 1);
+
+    return runtime / total_buffers;
 }

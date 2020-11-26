@@ -20,11 +20,17 @@ int main() {
     //Write output files to verify test case
     unit_test<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
     unit_test<FastFirCPU2>("input2.csv", "mask2.csv", "output2.csv");
+    unit_test<FastFirGPU1>("input3.csv", "mask3.csv", "output3.csv");
 
     //Generates random inputs, tests each implementation,
     // quantifies differences
     validate<FastFirCPU1, FastFirCPU2>(256, 1024, 9);
     validate<FastFirCPU2, FastFirGPU1>(256, 1024, 9);
+
+    //Tests per-call performance
+    double pc1 = test_performance<FastFirCPU1>();
+    //double pc2 = test_performance<FastFirCPU2>();
+    //double pc3 = test_performance<FastFirGPU1>();
 
 }
 

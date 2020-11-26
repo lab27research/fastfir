@@ -1,5 +1,7 @@
 #include "FastFirGPU1.h"
 
+#include <algorithm>
+
 FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
                          int buffers_per_call, bool contiguous)
     : FastFir(mask, mask_samps, input_samps, buffers_per_call, contiguous) {
@@ -26,8 +28,8 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     checkCudaErrors(cudaStreamCreate(&transfer1_stream_));
     checkCudaErrors(cudaStreamCreate(&transfer2_stream_));
 
-    //Default to 2 streams
-    initProcStreams(10);
+    //Default to 16 streams
+    initProcStreams(16);
 
     //Create one event per processing buffer
     transfer1_done_events_.resize(buffers_per_call_);
@@ -39,7 +41,7 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
 
     //Execute plans at least once to ensure no first-call overhead
     checkCudaErrors(cudaMemset(d_io_buffer_, 0, 2 * buffers_per_call_ * fft_size_ * sizeof(float)));
-    for (int ii = 0; ii < fwd_plans_.size(); ii++) {
+    for (int ii = 0; ii < std::min((int) fwd_plans_.size(),buffers_per_call_); ii++) {
         float* d_io_ptr = &d_io_buffer_[2 * ii * fft_size_];
         checkCudaErrors(cufftExecC2C(fwd_plans_[ii], (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
     }
@@ -83,8 +85,6 @@ void FastFirGPU1::run(float* input, float* output) {
     int num_proc_streams = proc_streams_.size();
     for (int ii = 0; ii < buffers_per_call_; ii++) {
         int proc_stream_index = ii % num_proc_streams;
-        proc_stream_index = 0;
-        printf("proc_stream_index=%i\n",proc_stream_index);
 
         //Choose streams
         cudaStream_t stream1 = transfer1_stream_;
