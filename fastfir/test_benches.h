@@ -1,7 +1,7 @@
 #pragma once
 
-#include "FastFirCPU1.h"
 #include "FastFir.h"
+#include "cuda_utils.h"
 #include "datplot_utils.h"
 #include <vector>
 
@@ -12,8 +12,9 @@ void test_reference_design();
 #include <string>
 using namespace std;
 
+//A unit test that processes a short sequence (that can be verified by hand)
 template <class ff_type>
-void unit_test(string input_csv, string mask_csv, string output_csv)
+void unit_test1(string input_csv, string mask_csv, string output_csv)
 {
     printf("Running unit test for %s, outputs at %s/%s/%s\n", typeid(ff_type).name(), input_csv.c_str(), mask_csv.c_str(), output_csv.c_str());
 
@@ -24,9 +25,9 @@ void unit_test(string input_csv, string mask_csv, string output_csv)
     float* mask;
     float* input;
     float* output;
-    ALIGNED_MALLOC(mask, 2 * mask_samps * sizeof(float));
-    ALIGNED_MALLOC(input, 2 * input_samps * sizeof(float));
-    ALIGNED_MALLOC(output, 2 * output_samps * sizeof(float));
+    HOST_MALLOC(&mask, 2 * mask_samps * sizeof(float));
+    HOST_MALLOC(&input, 2 * input_samps * sizeof(float));
+    HOST_MALLOC(&output, 2 * output_samps * sizeof(float));
     float fill1[2 * mask_samps] = { 1,0.5,1,0.5 };
     float fill2[2 * input_samps] = { 1,0,2,0,3,0,4,0 };
     memcpy(mask, fill1, 2 * mask_samps * sizeof(float));
@@ -41,6 +42,43 @@ void unit_test(string input_csv, string mask_csv, string output_csv)
     datplot_write_cf((char*)mask_csv.c_str(), mask, mask_samps, 0, 1);
     datplot_write_cf((char*)output_csv.c_str(), output, output_samps, 0, 1);
 
+}
+
+//A unit test that uses correlation of known random sequence to verify FIR implementation
+// (can verified expected peak by hand and see that peak in each buffer)
+//Note: resulting correlation peaks should have magnitude equal to mask_samps
+template<class ff_type>
+void unit_test2(string input_csv, string mask_csv, string output_csv) {
+    int buffers_per_call = 10;
+    int input_samps = 1024;
+    int mask_samps = 256;
+    int output_samps = FastFir::getOutputSamps2Sided(mask_samps, input_samps);
+    float* input;
+    float* flipped_mask;
+    float* output;
+    HOST_MALLOC(&flipped_mask, 2 * mask_samps * sizeof(float));
+    HOST_MALLOC(&input, 2 * input_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&output, 2 * output_samps * buffers_per_call * sizeof(float));
+
+    //Populate every inpt buffer with the same values
+    generate_wgn_cf(0.0, sqrt(2.0)/2.0, input, input_samps);
+    for (int ii = 1; ii < buffers_per_call; ii++) {
+        memcpy(&input[2 * ii * input_samps], input, 2 * input_samps * sizeof(float));
+    }
+    //Flipping and conjugating mask turns convolution into correlation
+    for (int ii = 0; ii < mask_samps; ii++) {
+        flipped_mask[2 * ii] = input[2 * (mask_samps - 1 - ii)];
+        flipped_mask[2 * ii + 1] = -input[2 * (mask_samps - 1 - ii) + 1];
+    }
+
+    //Create FIR Filter and run algorithm
+    ff_type ff1(flipped_mask, mask_samps, input_samps, buffers_per_call, true);
+    ff1.run(input, output);
+
+    //Write output files (should contain periodic correlation peaks)
+    datplot_write_cf((char*) mask_csv.c_str(), flipped_mask, mask_samps, 0, 1);
+    datplot_write_cf((char*) input_csv.c_str(), input, input_samps, 0, 1);
+    datplot_write_cf((char*) output_csv.c_str(), output, ff1.getTotalOutputSamps(), 0, 1);
 }
 
 //Validation test that compares two FastFilt implementations
@@ -59,12 +97,12 @@ void validate(int mask_samps, int input_samps, int buffers_per_call) {
     float* output2;
     float* output3;
     float* output4;
-    ALIGNED_MALLOC(mask, 2 * mask_samps * sizeof(float));
-    ALIGNED_MALLOC(input, 2 * input_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(output1, 2 * output_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(output2, 2 * output_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(output3, 2 * output_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(output4, 2 * output_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&mask, 2 * mask_samps * sizeof(float));
+    HOST_MALLOC(&input, 2 * input_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&output1, 2 * output_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&output2, 2 * output_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&output3, 2 * output_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&output4, 2 * output_samps * buffers_per_call * sizeof(float));
 
     //Generate input and mask, create filters for both contiguous and non-contiguous
     generate_wgn_cf(0.5, 0.1, mask, mask_samps);
@@ -122,43 +160,31 @@ void explore(char* output_csv,
 }
 
 template<class ff_type>
-double test_performance() {
-    int total_buffers = 1000;
-    int buffers_per_call = 10;
-    int input_samps = 1024;
-    int mask_samps = 256;
+double get_time_per_call(int mask_samps, int input_samps, int buffers_per_call, bool contiguous, int iterations) {
     int output_samps = FastFir::getOutputSamps2Sided(mask_samps, input_samps);
     float* input;
-    float* flipped_mask;
+    float* mask;
     float* output;
-    ALIGNED_MALLOC(flipped_mask, 2 * mask_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(input, 2 * input_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(output, 2 * output_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&mask, 2 * mask_samps * sizeof(float));
+    HOST_MALLOC(&input, 2 * input_samps * buffers_per_call * sizeof(float));
+    HOST_MALLOC(&output, 2 * output_samps * buffers_per_call * sizeof(float));
 
-    //Populate input and mask (flip and conjugate mask to make this correlation)
-    generate_wgn_cf(0.5, 0.1, input, input_samps);
-    for (int ii = 0; ii < mask_samps; ii++) {
-        flipped_mask[2 * ii] = input[2 * (mask_samps - 1 - ii)];
-        flipped_mask[2 * ii + 1] = -input[2 * (mask_samps - 1 - ii) + 1];
-    }
+    //Populate bogus mask and input
+    generate_wgn_cf(0.0, 0.5, input, input_samps);
+    memset(mask, 0, 2 * mask_samps);
+    memset(input, 0, 2 * input_samps * buffers_per_call * sizeof(float));
 
     //Create FIR Filter
-    ff_type ff1(flipped_mask, mask_samps, input_samps, buffers_per_call, false);
+    ff_type ff1(mask, mask_samps, input_samps, buffers_per_call, true);
 
     //This is where we need to add test bench
     Stopwatch sw;
-    for (int ii = 0; ii < total_buffers / buffers_per_call; ii++) {
+    for (int ii = 0; ii < iterations; ii++) {
 
         //Run algorithm
         ff1.run(input, output);
     }
     double runtime = sw.getElapsed();
-    printf("Completed in %.9f seconds\n", runtime);
-    printf("Average time per run: %.9f\n", runtime / total_buffers);
 
-    datplot_write_cf("peak1.csv", flipped_mask, mask_samps, 0, 1);
-    datplot_write_cf("peak2.csv", input, input_samps, 0, 1);
-    datplot_write_cf("peak3.csv", output, ff1.getTotalOutputSamps(), 0, 1);
-
-    return runtime / total_buffers;
+    return runtime / iterations;
 }

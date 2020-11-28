@@ -1,5 +1,6 @@
 #include "FastFirCPU1.h"
 #include "math_utils.h"
+#include "cuda_utils.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -9,7 +10,7 @@ FastFirCPU1::FastFirCPU1(float* mask, int mask_samps, int input_samps,
     :FastFir(mask, mask_samps, input_samps, buffers_per_call, contiguous)
 {
     //Allocate mask buffer and copy in mask data
-    ALIGNED_MALLOC(mask_buffer_, 2 * mask_samps_ * sizeof(float));
+    HOST_MALLOC(&mask_buffer_, 2 * mask_samps_ * sizeof(float));
 
     //Reverse mask in memory (we are performing convolution)
     for (int ii = 0; ii < mask_samps_; ii++) {
@@ -22,7 +23,7 @@ FastFirCPU1::FastFirCPU1(float* mask, int mask_samps, int input_samps,
 FastFirCPU1::~FastFirCPU1()
 {
     //Free mask memory
-    ALIGNED_FREE(mask_buffer_);
+    HOST_FREE(mask_buffer_);
 
 }
 

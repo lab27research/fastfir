@@ -17,61 +17,31 @@
 #include "add_kernel.h"
 int main() {
 
-    //Write output files to verify test case
-    unit_test<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
-    unit_test<FastFirCPU2>("input2.csv", "mask2.csv", "output2.csv");
-    unit_test<FastFirGPU1>("input3.csv", "mask3.csv", "output3.csv");
+    //Run unit tests that can be verified externally
+    unit_test1<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
+    unit_test2<FastFirCPU1>("input2.csv", "mask2.csv", "output2.csv");
 
-    //Generates random inputs, tests each implementation,
-    // quantifies differences
+    //Compare implementations and understand output difference
     validate<FastFirCPU1, FastFirCPU2>(256, 1024, 9);
     validate<FastFirCPU2, FastFirGPU1>(256, 1024, 9);
 
-    //Tests per-call performance
-    double pc1 = test_performance<FastFirCPU1>();
-    //double pc2 = test_performance<FastFirCPU2>();
-    //double pc3 = test_performance<FastFirGPU1>();
-
-}
-
-void test() {
-    int buffers_per_call = 10;
-    int input_samps = 1024;
+    //Tests per-call performance (small workload)
     int mask_samps = 256;
-    int output_samps = FastFir::getOutputSamps2Sided(mask_samps, input_samps);
-    float* input;
-    float* mask;
-    float* output;
-    ALIGNED_MALLOC(mask, 2 * mask_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(input, 2 * input_samps * buffers_per_call * sizeof(float));
-    ALIGNED_MALLOC(output, 2 * output_samps * buffers_per_call * sizeof(float));
+    int input_samps = 1024;
+    int buffers_per_call = 10;
+    int iterations = 100;
+    double pc1 = get_time_per_call<FastFirCPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    double pc2 = get_time_per_call<FastFirCPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    double pc3 = get_time_per_call<FastFirGPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    printf("pc1=%f, pc2=%f, pc3=%f\n", pc1, pc2, pc3);
 
-    //Create CPU-Based FIR Filter
-    FastFirCPU2 ff1(mask, mask_samps, input_samps, buffers_per_call, false);
-
-    //Create input source
-    double snr = 10;
-    unsigned int samp0 = 5;
-    ImpulseSource is(snr, samp0);
-
-    //This is where we need to add test bench
-    Stopwatch sw;
-    int total_runs = 10;
-    for (int ii = 0; ii < total_runs / buffers_per_call; ii++) {
-
-        //Fill input buffers
-        for (int jj = 0; jj < buffers_per_call; jj++) {
-            is.getBuffer(&input[2 * jj * input_samps], input_samps);
-        }
-
-        //Run algorithm
-        ff1.run(input, output);
-    }
-    double runtime = sw.getElapsed();
-    printf("Completed in %.9f seconds\n", runtime);
-    printf("Average time per run: %.9f\n", runtime / total_runs);
-
-    datplot_write_cf("input.csv", input, input_samps);
-    datplot_write_cf("output.csv", output, output_samps);
+    //Test per-call performance (large workload)
+    mask_samps = 128 * 1024;
+    input_samps = 512 * 1024;
+    buffers_per_call = 10;
+    iterations = 100;
+    double pc4 = get_time_per_call<FastFirCPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    double pc5 = get_time_per_call<FastFirGPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    printf("pc4=%f, pc5=%f\n", pc4, pc5);
 
 }

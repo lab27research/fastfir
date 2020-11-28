@@ -1,5 +1,6 @@
 #include "FastFirCPU2.h"
 #include "math_utils.h"
+#include "cuda_utils.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -13,8 +14,8 @@ FastFirCPU2::FastFirCPU2(float* mask, int mask_samps, int input_samps,
     fft_size_ = FastFir::getFFTSize(mask_samps, input_samps);
 
     //Allocate input/output buffer and mask fft buffer
-    ALIGNED_MALLOC(io_buffer_, 2 * fft_size_ * sizeof(float));
-    ALIGNED_MALLOC(mask_buffer_, 2 * fft_size_ * sizeof(float));
+    HOST_MALLOC(&io_buffer_, 2 * fft_size_ * sizeof(float));
+    HOST_MALLOC(&mask_buffer_, 2 * fft_size_ * sizeof(float));
 
     //Generate mask FFT buffer (only need to do this once)
     fwd_plan_ = fftwf_plan_dft_1d(fft_size_,
@@ -49,8 +50,8 @@ FastFirCPU2::~FastFirCPU2()
     fftwf_destroy_plan(rev_plan_);
 
     //Free all memory
-    ALIGNED_FREE(io_buffer_);
-    ALIGNED_FREE(mask_buffer_);
+    HOST_FREE(io_buffer_);
+    HOST_FREE(mask_buffer_);
 
 }
 
@@ -67,7 +68,7 @@ void FastFirCPU2::run(float* input, float* output)
     for (int ii = 0; ii < buffers_per_call_; ii++) {
 
         //Copy in and zero pad
-        memcpy(io_buffer_, in_ptr, 2 * fft_size_ * sizeof(float));
+        memcpy(io_buffer_, in_ptr, 2 * input_samps_ * sizeof(float));
         memset(&io_buffer_[2 * input_samps_], 0, 2 * (fft_size_ - input_samps_) * sizeof(float));
 
         //Run fwd fft
