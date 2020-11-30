@@ -10,12 +10,16 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     fft_size_ = FastFir::getFFTSize(mask_samps_, input_samps_);
 
     //Allocate device memory
-    DEVICE_MALLOC((void**)&d_io_buffer_, 2 * buffers_per_call_ * fft_size_ * sizeof(float));
-    DEVICE_MALLOC((void**)&d_mask_buffer_, 2 * fft_size_ * sizeof(float));
+    size_t io_buffer_bytes = sizeof(float) * 2 * buffers_per_call_ * fft_size_;
+    size_t mask_buffer_bytes = sizeof(float) * 2 * fft_size_;
+    DEVICE_MALLOC((void**)&d_io_buffer_, io_buffer_bytes);
+    DEVICE_MALLOC((void**)&d_mask_buffer_, mask_buffer_bytes);
 
     //Initialize mask buffer
-    checkCudaErrors(cudaMemcpy(d_mask_buffer_, mask, 2 * mask_samps_ * sizeof(float), cudaMemcpyHostToDevice));
-    checkCudaErrors(cudaMemset(&d_mask_buffer_[2 * mask_samps_], 0, 2 * (fft_size_ - mask_samps_) * sizeof(float)));
+    size_t mask_bytes = sizeof(float) * 2 * mask_samps_;
+    size_t non_mask_bytes = sizeof(float) * 2 * (fft_size_ - mask_samps_);
+    checkCudaErrors(cudaMemcpy(d_mask_buffer_, mask, mask_bytes, cudaMemcpyHostToDevice));
+    checkCudaErrors(cudaMemset(&d_mask_buffer_[2 * mask_samps_], 0, non_mask_bytes));
 
     cufftHandle temp_plan;
     checkCudaErrors(cufftCreate(&temp_plan));
@@ -28,8 +32,10 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     checkCudaErrors(cudaStreamCreate(&transfer1_stream_));
     checkCudaErrors(cudaStreamCreate(&transfer2_stream_));
 
-    //Default to 16 streams
-    initProcStreams(16);
+    //Default to buffers_per_call_, with a max of 8
+    //Note: each one must allocate their own FFT working buffers!
+    // todo: recommend checking GPU memory and warning/limiting here
+    initProcStreams(std::min(8, buffers_per_call_));
 
     //Create one event per processing buffer
     transfer1_done_events_.resize(buffers_per_call_);
@@ -40,8 +46,8 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     }
 
     //Execute plans at least once to ensure no first-call overhead
-    checkCudaErrors(cudaMemset(d_io_buffer_, 0, 2 * buffers_per_call_ * fft_size_ * sizeof(float)));
-    for (int ii = 0; ii < std::min((int) fwd_plans_.size(),buffers_per_call_); ii++) {
+    checkCudaErrors(cudaMemset(d_io_buffer_, 0, io_buffer_bytes));
+    for (int ii = 0; ii < std::min((int)fwd_plans_.size(), buffers_per_call_); ii++) {
         float* d_io_ptr = &d_io_buffer_[2 * ii * fft_size_];
         checkCudaErrors(cufftExecC2C(fwd_plans_[ii], (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
     }
@@ -64,9 +70,14 @@ FastFirGPU1::~FastFirGPU1() {
 }
 
 void FastFirGPU1::run(float* input, float* output) {
+    size_t input_bytes = sizeof(float) * 2 * input_samps_;
+    size_t non_input_bytes = sizeof(float) * 2 * (fft_size_ - input_samps_);
     int output_samps_0sided = FastFir::getOutputSampsNoTransient(mask_samps_, input_samps_);
     int output_samps_1sided = FastFir::getOutputSamps1Sided(mask_samps_, input_samps_);
     int output_samps_2sided = FastFir::getOutputSamps2Sided(mask_samps_, input_samps_);
+    size_t output_bytes_0sided = sizeof(float) * 2 * output_samps_0sided;
+    size_t output_bytes_1sided = sizeof(float) * 2 * output_samps_1sided;
+    size_t output_bytes_2sided = sizeof(float) * 2 * output_samps_2sided;
     int left_transient_samps = output_samps_1sided - output_samps_0sided;
 
     ////Determine kernal parameters
@@ -100,8 +111,8 @@ void FastFirGPU1::run(float* input, float* output) {
         float* h_input_ptr = &input[2 * ii * input_samps_];
 
         //Transfer1 : H->D : Move input samples to device and zero pad
-        checkCudaErrors(cudaMemcpyAsync(d_io_ptr, h_input_ptr, 2 * input_samps_ * sizeof(float), cudaMemcpyHostToDevice, stream1));
-        checkCudaErrors(cudaMemsetAsync(&d_io_ptr[2 * input_samps_], 0, 2 * (fft_size_ - input_samps_) * sizeof(float)));
+        checkCudaErrors(cudaMemcpyAsync(d_io_ptr, h_input_ptr, input_bytes, cudaMemcpyHostToDevice, stream1));
+        checkCudaErrors(cudaMemsetAsync(&d_io_ptr[2 * input_samps_], 0, non_input_bytes));
         checkCudaErrors(cudaEventRecord(transfer1_done_events_[ii], stream1));
 
         //Run fwd fft
@@ -123,8 +134,8 @@ void FastFirGPU1::run(float* input, float* output) {
             // Note: for all buffers except the first
             if (ii != 0) {
                 checkCudaErrors(cudaStreamWaitEvent(stream2, kernels_done_events_[ii - 1]));
-                float* prev_d_io_ptr = &d_io_buffer_[2 * (ii-1) * fft_size_];
-                vectorCpxAdd << <num_blocks2, tpb, 0, stream2 >> > (d_io_ptr, &prev_d_io_ptr[2*output_samps_1sided], d_io_ptr, left_transient_samps);
+                float* prev_d_io_ptr = &d_io_buffer_[2 * (ii - 1) * fft_size_];
+                vectorCpxAdd << <num_blocks2, tpb, 0, stream2 >> > (d_io_ptr, &prev_d_io_ptr[2 * output_samps_1sided], d_io_ptr, left_transient_samps);
                 checkCudaErrors(cudaPeekAtLastError());
             }
         }
@@ -135,20 +146,20 @@ void FastFirGPU1::run(float* input, float* output) {
         checkCudaErrors(cudaStreamWaitEvent(stream3, kernels_done_events_[ii]));
         if (!contiguous_) {
             //Simply move data to its respective output buffer
-            checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, 2 * output_samps_2sided * sizeof(float), cudaMemcpyDeviceToHost, stream3));
+            checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_2sided, cudaMemcpyDeviceToHost, stream3));
 
             h_output_ptr += 2 * output_samps_2sided;
         }
         else {
             //We need to add in overlaps
-            if (ii != buffers_per_call_-1) {
+            if (ii != buffers_per_call_ - 1) {
                 //Simply move the first data into output buffer
-                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, 2 * output_samps_1sided * sizeof(float), cudaMemcpyDeviceToHost, stream3));
+                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_1sided, cudaMemcpyDeviceToHost, stream3));
                 h_output_ptr += 2 * output_samps_1sided;
             }
             else {
                 //Copy full 2-sided result for last buffer
-                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, 2 * output_samps_2sided * sizeof(float), cudaMemcpyDeviceToHost, stream3));
+                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_2sided, cudaMemcpyDeviceToHost, stream3));
                 h_output_ptr += 2 * output_samps_2sided;
             }
 

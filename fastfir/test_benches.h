@@ -2,15 +2,15 @@
 
 #include "FastFir.h"
 #include "cuda_utils.h"
-#include "datplot_utils.h"
+#include "Stopwatch.h"
+
 #include <vector>
+#include <string>
+using namespace std;
 
 //Unit tests
 void test_generate_wgn_cf();
-void test_reference_design();
-
-#include <string>
-using namespace std;
+void test_cufft();
 
 //A unit test that processes a short sequence (that can be verified by hand)
 template <class ff_type>
@@ -42,6 +42,11 @@ void unit_test1(string input_csv, string mask_csv, string output_csv)
     datplot_write_cf((char*)mask_csv.c_str(), mask, mask_samps, 0, 1);
     datplot_write_cf((char*)output_csv.c_str(), output, output_samps, 0, 1);
 
+    //Free memory
+    HOST_FREE(mask);
+    HOST_FREE(input);
+    HOST_FREE(output);
+
 }
 
 //A unit test that uses correlation of known random sequence to verify FIR implementation
@@ -61,7 +66,7 @@ void unit_test2(string input_csv, string mask_csv, string output_csv) {
     HOST_MALLOC(&output, 2 * output_samps * buffers_per_call * sizeof(float));
 
     //Populate every inpt buffer with the same values
-    generate_wgn_cf(0.0, sqrt(2.0)/2.0, input, input_samps);
+    generate_wgn_cf(0.0, sqrt(2.0) / 2.0, input, input_samps);
     for (int ii = 1; ii < buffers_per_call; ii++) {
         memcpy(&input[2 * ii * input_samps], input, 2 * input_samps * sizeof(float));
     }
@@ -76,9 +81,14 @@ void unit_test2(string input_csv, string mask_csv, string output_csv) {
     ff1.run(input, output);
 
     //Write output files (should contain periodic correlation peaks)
-    datplot_write_cf((char*) mask_csv.c_str(), flipped_mask, mask_samps, 0, 1);
-    datplot_write_cf((char*) input_csv.c_str(), input, input_samps, 0, 1);
-    datplot_write_cf((char*) output_csv.c_str(), output, ff1.getTotalOutputSamps(), 0, 1);
+    datplot_write_cf((char*)mask_csv.c_str(), flipped_mask, mask_samps, 0, 1);
+    datplot_write_cf((char*)input_csv.c_str(), input, input_samps, 0, 1);
+    datplot_write_cf((char*)output_csv.c_str(), output, ff1.getTotalOutputSamps(), 0, 1);
+
+    //Free memory
+    HOST_FREE(flipped_mask);
+    HOST_FREE(input);
+    HOST_FREE(output);
 }
 
 //Validation test that compares two FastFilt implementations
@@ -148,15 +158,72 @@ void validate(int mask_samps, int input_samps, int buffers_per_call) {
     }
     printf("Non-contiguous SNR: %f\n", 10.0 * log10(accum1 / accum2));
     printf("Contiguous SNR: %f\n", 10.0 * log10(accum3 / accum4));
+
+    //Free memory
+    HOST_FREE(mask);
+    HOST_FREE(input);
+    HOST_FREE(output1);
+    HOST_FREE(output2);
+    HOST_FREE(output3);
+    HOST_FREE(output4);
 }
 
 //Test varies processing parameters for passed FastFir and writes a summary output csv outlining
 // performance metrics
+struct FFConfig {
+    int mask_samps;
+    int input_samps;
+    int buffer_per_call;
+    bool contiguous;
+    int iterations;
+};
+
+struct FFResult {
+    //Input parameters
+    FFConfig config;
+
+    //Output parameters
+    double time_per_buffer;
+    double time_flops_per_buffer;
+    double freq_flops_per_buffer;
+    double time_fps;
+    double freq_fps;
+};
+
+
+#include "datplot_utils.h"
+
 template <class ff_type1>
 void explore(char* output_csv,
-             std::vector<int> mask_sizes,
-             std::vector<int> input_sizes,
-             std::vector<int> buffers_per_call) {
+             vector<FFConfig>& config_list) {
+
+    printf("Running explore for %s\n", typeid(ff_type1).name());
+
+    //Run all specified processing
+    vector<FFResult> results;
+    for (int ii = 0; ii < config_list.size(); ii++) {
+        int mask_samps = config_list[ii].mask_samps;
+        int input_samps = config_list[ii].input_samps;
+        int buffers_per_call = config_list[ii].buffer_per_call;
+        bool contiguous = config_list[ii].contiguous;
+        int iterations = config_list[ii].iterations;
+        printf("config: %i %i %i %i %i...", mask_samps, input_samps, buffers_per_call, contiguous, iterations);
+
+        //Run processing and store results
+        FFResult res;
+        res.config = config_list[ii];
+        res.time_per_buffer = get_time_per_call<ff_type1>(mask_samps, input_samps, buffers_per_call, contiguous, 1000) / buffers_per_call;
+        res.time_flops_per_buffer = FastFir::getTimeDomainFLOPs(mask_samps, input_samps);
+        res.freq_flops_per_buffer = FastFir::getFreqDomainFLOPs(mask_samps, input_samps);
+        res.time_fps = res.time_flops_per_buffer / res.time_per_buffer;
+        res.freq_fps = res.freq_flops_per_buffer / res.time_per_buffer;
+        results.push_back(res);
+
+        printf("%f GFLOPs/sec\n", res.freq_fps/1e9);
+    }
+
+    //Write output data
+    dataplot_write_ffresults(output_csv, results);
 }
 
 template<class ff_type>
@@ -165,19 +232,24 @@ double get_time_per_call(int mask_samps, int input_samps, int buffers_per_call, 
     float* input;
     float* mask;
     float* output;
-    HOST_MALLOC(&mask, 2 * mask_samps * sizeof(float));
-    HOST_MALLOC(&input, 2 * input_samps * buffers_per_call * sizeof(float));
-    HOST_MALLOC(&output, 2 * output_samps * buffers_per_call * sizeof(float));
+    size_t mask_bytes = sizeof(float) * 2 * mask_samps;
+    size_t input_bytes = sizeof(float) * 2 * input_samps * buffers_per_call;
+    size_t output_bytes = sizeof(float) * 2 * output_samps * buffers_per_call;
+    HOST_MALLOC(&mask, mask_bytes);
+    HOST_MALLOC(&input, input_bytes);
+    HOST_MALLOC(&output, output_bytes);
 
     //Populate bogus mask and input
-    generate_wgn_cf(0.0, 0.5, input, input_samps);
+    printf("Running memsets...\n");
     memset(mask, 0, 2 * mask_samps);
     memset(input, 0, 2 * input_samps * buffers_per_call * sizeof(float));
 
     //Create FIR Filter
-    ff_type ff1(mask, mask_samps, input_samps, buffers_per_call, true);
+    printf("Creating filter...\n");
+    ff_type ff1(mask, mask_samps, input_samps, buffers_per_call, contiguous);
 
     //This is where we need to add test bench
+    printf("Running filter...\n");
     Stopwatch sw;
     for (int ii = 0; ii < iterations; ii++) {
 
@@ -185,6 +257,11 @@ double get_time_per_call(int mask_samps, int input_samps, int buffers_per_call, 
         ff1.run(input, output);
     }
     double runtime = sw.getElapsed();
+
+    //Free memory
+    HOST_FREE(mask);
+    HOST_FREE(input);
+    HOST_FREE(output);
 
     return runtime / iterations;
 }

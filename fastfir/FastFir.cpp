@@ -36,6 +36,12 @@ int FastFir::getFFTSize(int mask_samps, int input_samps)
 {
     //Code grabbed from https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
     unsigned int vv = FastFir::getOutputSamps2Sided(mask_samps, input_samps);
+
+    if (vv == 0) {
+        //Technically next power of two would be 1 (would return 0 unless we intervene)
+        return 1;
+    }
+
     vv--;
     vv |= vv >> 1;
     vv |= vv >> 2;
@@ -71,6 +77,15 @@ double FastFir::getTimeDomainFLOPs(int mask_samps, int input_samps)
 
 double FastFir::getFreqDomainFLOPs(int mask_samps, int input_samps)
 {
-    double WW = FastFir::getFFTSize(mask_samps, input_samps);
-    return (10 * WW * log2(WW)) + (6 * WW);
+    //Assume non-contiguous
+    double fft_size = FastFir::getFFTSize(mask_samps, input_samps);
+
+    //Note: two transforms (forward and reverse), one complex mpy per fft point
+    double cpx_mpys = (2*(fft_size / 2) * log2(fft_size) + fft_size);
+    double cpx_adds = (2*(fft_size)*log2(fft_size));
+
+    //Also include scaling operation (to accomodate for non-scaled transforms)
+    cpx_mpys += 2 * fft_size;
+
+    return 6 * cpx_mpys + 2 * cpx_adds;
 }

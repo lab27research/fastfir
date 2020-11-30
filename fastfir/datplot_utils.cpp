@@ -31,3 +31,23 @@ void datplot_write_cf(char* filename, float* data, int data_samps, double xstart
     fclose(fid);
 }
 
+void dataplot_write_ffresults(char* filename, std::vector<FFResult>& result_list) {
+    FILE* fid = fopen(filename, "w");
+
+    fprintf(fid, "index,mask_samps,input_samps,time_per_buffer,time_flops_per_buffer,freq_flops_per_buffer,estimated_time_fps,estimated_freq_fps\n");
+
+    for (int ii = 0; ii < result_list.size(); ii++) {
+        fprintf(fid, "%i", ii);
+        fprintf(fid, ",%i", result_list[ii].config.mask_samps);
+        fprintf(fid, ",%i", result_list[ii].config.input_samps);
+        fprintf(fid, ",%.16e", result_list[ii].time_per_buffer);
+        fprintf(fid, ",%.16e", result_list[ii].time_flops_per_buffer);
+        fprintf(fid, ",%.16e", result_list[ii].freq_flops_per_buffer);
+        fprintf(fid, ",%.16e", result_list[ii].time_fps);
+        fprintf(fid, ",%.16e", result_list[ii].freq_fps);
+        fprintf(fid, "\n");
+    }
+
+    fclose(fid);
+}
+

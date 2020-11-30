@@ -10,7 +10,8 @@ FastFirCPU1::FastFirCPU1(float* mask, int mask_samps, int input_samps,
     :FastFir(mask, mask_samps, input_samps, buffers_per_call, contiguous)
 {
     //Allocate mask buffer and copy in mask data
-    HOST_MALLOC(&mask_buffer_, 2 * mask_samps_ * sizeof(float));
+    size_t mask_buffer_bytes = sizeof(float) * 2 * mask_samps_;
+    HOST_MALLOC(&mask_buffer_, mask_buffer_bytes);
 
     //Reverse mask in memory (we are performing convolution)
     for (int ii = 0; ii < mask_samps_; ii++) {

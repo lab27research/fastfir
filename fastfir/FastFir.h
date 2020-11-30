@@ -29,7 +29,7 @@ public:
     //Returns the FLOPs per buffer for the two-sided time domain implementation
     static double getTimeDomainFLOPs(int mask_samps, int input_samps);
 
-    //Returns the FLOPs per buffer for freq domain implementation
+    //Returns the FLOPs per buffer for the two-sided freq domain implementation
     static double getFreqDomainFLOPs(int mask_samps, int input_samps);
 
 protected:
