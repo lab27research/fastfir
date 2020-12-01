@@ -81,12 +81,10 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="add_kernel.cu" />
     <CudaCompile Include="cuda_utils.cu" />
     <CudaCompile Include="FastFirGPU1.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="add_kernel.h" />
     <ClInclude Include="datplot_utils.h" />
     <ClInclude Include="FastFir.h" />
     <ClInclude Include="FastFirCPU1.h" />

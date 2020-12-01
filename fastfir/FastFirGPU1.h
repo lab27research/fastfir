@@ -29,12 +29,10 @@ private:
 
     //Transfer streams
     cudaStream_t transfer1_stream_;//For transfers H->D
-    cudaStream_t transfer2_stream_;//For transfers D->H
 
     //Streams/plan variables, one for each processing stream
-    std::vector<cudaStream_t> proc_streams_;//For all processing
-    std::vector<cufftHandle> fwd_plans_;
-    std::vector<cufftHandle> rev_plans_;
+    std::vector<cudaStream_t> proc_streams_;//For all processing and D->H transfers
+    std::vector<cufftHandle> cufft_plans_;
 
     //Stream synchronization events (one for each buffer)
     std::vector<cudaEvent_t> transfer1_done_events_;

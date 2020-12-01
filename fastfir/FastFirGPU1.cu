@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "nvtx3/nvToolsExt.h"
+
 FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
                          int buffers_per_call, bool contiguous)
     : FastFir(mask, mask_samps, input_samps, buffers_per_call, contiguous) {
@@ -30,12 +32,11 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
 
     //Initialize transfer streams
     checkCudaErrors(cudaStreamCreate(&transfer1_stream_));
-    checkCudaErrors(cudaStreamCreate(&transfer2_stream_));
 
-    //Default to buffers_per_call_, with a max of 8
+    //Default to buffers_per_call_, with a max of 4
     //Note: each one must allocate their own FFT working buffers!
     // todo: recommend checking GPU memory and warning/limiting here
-    initProcStreams(std::min(8, buffers_per_call_));
+    initProcStreams(std::min(4, buffers_per_call_));
 
     //Create one event per processing buffer
     transfer1_done_events_.resize(buffers_per_call_);
@@ -47,10 +48,12 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
 
     //Execute plans at least once to ensure no first-call overhead
     checkCudaErrors(cudaMemset(d_io_buffer_, 0, io_buffer_bytes));
-    for (int ii = 0; ii < std::min((int)fwd_plans_.size(), buffers_per_call_); ii++) {
+    for (int ii = 0; ii < std::min((int)cufft_plans_.size(), buffers_per_call_); ii++) {
         float* d_io_ptr = &d_io_buffer_[2 * ii * fft_size_];
-        checkCudaErrors(cufftExecC2C(fwd_plans_[ii], (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
+        checkCudaErrors(cufftExecC2C(cufft_plans_[ii], (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
+        checkCudaErrors(cufftExecC2C(cufft_plans_[ii], (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_INVERSE));
     }
+    cudaDeviceSynchronize();
 }
 
 FastFirGPU1::~FastFirGPU1() {
@@ -70,6 +73,7 @@ FastFirGPU1::~FastFirGPU1() {
 }
 
 void FastFirGPU1::run(float* input, float* output) {
+    nvtxRangePushA("FastFirGPU1::run");
     size_t input_bytes = sizeof(float) * 2 * input_samps_;
     size_t non_input_bytes = sizeof(float) * 2 * (fft_size_ - input_samps_);
     int output_samps_0sided = FastFir::getOutputSampsNoTransient(mask_samps_, input_samps_);
@@ -88,23 +92,21 @@ void FastFirGPU1::run(float* input, float* output) {
     int num_blocks2 = getNumBlocks(tpb, left_transient_samps);
 
     //Calculate fft scaling
-    float scale = ((double)1.0) / fft_size_;
+    float scale = (float) (((double)1.0) / fft_size_);
 
     //Output pointer movement depends on if we are using contiguous buffers
     float* h_output_ptr = output;
 
-    int num_proc_streams = proc_streams_.size();
+    int num_proc_streams = (int) proc_streams_.size();
     for (int ii = 0; ii < buffers_per_call_; ii++) {
         int proc_stream_index = ii % num_proc_streams;
 
         //Choose streams
         cudaStream_t stream1 = transfer1_stream_;
         cudaStream_t stream2 = proc_streams_[proc_stream_index];
-        cudaStream_t stream3 = transfer2_stream_;
 
         //Choose cufft plans
-        cufftHandle fwd_plan = fwd_plans_[proc_stream_index];
-        cufftHandle rev_plan = rev_plans_[proc_stream_index];
+        cufftHandle cufft_plan = cufft_plans_[proc_stream_index];
 
         //Set buffer pointers
         float* d_io_ptr = &d_io_buffer_[2 * ii * fft_size_];
@@ -112,12 +114,12 @@ void FastFirGPU1::run(float* input, float* output) {
 
         //Transfer1 : H->D : Move input samples to device and zero pad
         checkCudaErrors(cudaMemcpyAsync(d_io_ptr, h_input_ptr, input_bytes, cudaMemcpyHostToDevice, stream1));
-        checkCudaErrors(cudaMemsetAsync(&d_io_ptr[2 * input_samps_], 0, non_input_bytes));
+        checkCudaErrors(cudaMemsetAsync(&d_io_ptr[2 * input_samps_], 0, non_input_bytes, stream1));
         checkCudaErrors(cudaEventRecord(transfer1_done_events_[ii], stream1));
 
         //Run fwd fft
         checkCudaErrors(cudaStreamWaitEvent(stream2, transfer1_done_events_[ii]));
-        checkCudaErrors(cufftExecC2C(fwd_plan, (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
+        checkCudaErrors(cufftExecC2C(cufft_plan, (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
 
         //Run cpx mpy/scaling kernel
         vectorCpxMpy << <num_blocks1, tpb, 0, stream2 >> > (d_io_ptr, d_mask_buffer_, d_io_ptr, fft_size_);
@@ -127,7 +129,7 @@ void FastFirGPU1::run(float* input, float* output) {
         checkCudaErrors(cudaPeekAtLastError());
 
         //Run rev fft
-        checkCudaErrors(cufftExecC2C(rev_plan, (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_INVERSE));
+        checkCudaErrors(cufftExecC2C(cufft_plan, (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_INVERSE));
 
         if (contiguous_) {
             //For contiguous, add in transient from previous kernels (need to wait until they are finished)
@@ -143,10 +145,9 @@ void FastFirGPU1::run(float* input, float* output) {
 
 
         //Transfer2 : D->H : Move output samples to host
-        checkCudaErrors(cudaStreamWaitEvent(stream3, kernels_done_events_[ii]));
         if (!contiguous_) {
             //Simply move data to its respective output buffer
-            checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_2sided, cudaMemcpyDeviceToHost, stream3));
+            checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_2sided, cudaMemcpyDeviceToHost, stream2));
 
             h_output_ptr += 2 * output_samps_2sided;
         }
@@ -154,12 +155,12 @@ void FastFirGPU1::run(float* input, float* output) {
             //We need to add in overlaps
             if (ii != buffers_per_call_ - 1) {
                 //Simply move the first data into output buffer
-                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_1sided, cudaMemcpyDeviceToHost, stream3));
+                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_1sided, cudaMemcpyDeviceToHost, stream2));
                 h_output_ptr += 2 * output_samps_1sided;
             }
             else {
                 //Copy full 2-sided result for last buffer
-                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_2sided, cudaMemcpyDeviceToHost, stream3));
+                checkCudaErrors(cudaMemcpyAsync(h_output_ptr, d_io_ptr, output_bytes_2sided, cudaMemcpyDeviceToHost, stream2));
                 h_output_ptr += 2 * output_samps_2sided;
             }
 
@@ -167,11 +168,8 @@ void FastFirGPU1::run(float* input, float* output) {
     }
 
     //Synchronize all streams
-    cudaStreamSynchronize(transfer1_stream_);
-    for (int ii = 0; ii < num_proc_streams; ii++) {
-        cudaStreamSynchronize(proc_streams_[ii]);
-    }
-    cudaStreamSynchronize(transfer2_stream_);
+    cudaDeviceSynchronize();
+    nvtxRangePop();
 }
 
 
@@ -184,30 +182,25 @@ void FastFirGPU1::initProcStreams(int num_streams) {
     //De-allocate any currently created strams/plans
     if (proc_streams_.size() != 0) {
         for (int ii = 0; ii < proc_streams_.size(); ii++) {
-            checkCudaErrors(cufftDestroy(fwd_plans_[ii]));
-            checkCudaErrors(cufftDestroy(rev_plans_[ii]));
+            checkCudaErrors(cufftDestroy(cufft_plans_[ii]));
             checkCudaErrors(cudaStreamDestroy(proc_streams_[ii]));
         }
     }
 
     //Initialize new configuration
-    fwd_plans_.resize(num_streams);
-    rev_plans_.resize(num_streams);
+    cufft_plans_.resize(num_streams);
     proc_streams_.resize(num_streams);
     for (int ii = 0; ii < num_streams; ii++) {
         //Initialize streams
         checkCudaErrors(cudaStreamCreate(&proc_streams_[ii]));
 
         //Create cufft plans
-        cufftCreate(&fwd_plans_[ii]);
-        checkCudaErrors(cufftCreate(&rev_plans_[ii]));
+        checkCudaErrors(cufftCreate(&cufft_plans_[ii]));
         size_t workSize;
-        checkCudaErrors(cufftMakePlan1d(fwd_plans_[ii], fft_size_, CUFFT_C2C, 1, &workSize));
-        checkCudaErrors(cufftMakePlan1d(rev_plans_[ii], fft_size_, CUFFT_C2C, 1, &workSize));
+        checkCudaErrors(cufftMakePlan1d(cufft_plans_[ii], fft_size_, CUFFT_C2C, 1, &workSize));
 
         //Associate streams to plans
-        checkCudaErrors(cufftSetStream(fwd_plans_[ii], proc_streams_[ii]));
-        checkCudaErrors(cufftSetStream(rev_plans_[ii], proc_streams_[ii]));
+        checkCudaErrors(cufftSetStream(cufft_plans_[ii], proc_streams_[ii]));
     }
 }
 

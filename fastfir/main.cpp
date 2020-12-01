@@ -46,7 +46,6 @@ void nsight_compute_test() {
     explore<FastFirGPU1>("nsight_compute_test.csv", configs);
 }
 
-#include "add_kernel.h"
 int main() {
 
     nsight_compute_test();
@@ -85,9 +84,9 @@ int main() {
 
     //Run "explore" command to test a variety of input sizes
     std::vector<FFConfig> configs;
-    size_t target_memsize = 0.25 * 1024 * 1024 * 1024;
-    int min_pow = 22;
-    int max_pow = 29;
+    size_t target_memsize = round(0.25 * 1024 * 1024 * 1024);//Target around a gig total buffer size
+    int min_pow = 10;
+    int max_pow = 28;
     int explore_iterations = 4;
     //Note: Use for full results (ran overnight)
     //int min_pow = 8;
@@ -95,7 +94,7 @@ int main() {
     //int iterations = 10;
     for (int ii = min_pow; ii <= max_pow; ii++) {
         FFConfig cc;
-        cc.input_samps = pow(2, ii);
+        cc.input_samps = (int) pow(2, ii);
         cc.mask_samps = cc.input_samps / 4;
         cc.buffer_per_call = std::max(1, (int)round(target_memsize / (sizeof(float) * 2 * cc.input_samps)));
 

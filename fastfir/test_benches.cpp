@@ -15,8 +15,8 @@ void test_generate_wgn_cf() {
 void test_cufft() {
     printf("Running test_cufft...\n");
     int iterations = 100;
-    size_t min_pow = 4;
-    size_t max_pow = 25;
+    int min_pow = 4;
+    int max_pow = 25;
     size_t max_fft_size = round(pow(2, max_pow));
 
     //Allocate device memory for largest tranform
@@ -26,7 +26,7 @@ void test_cufft() {
     cudaMemset(buffer, 1, 2 * max_fft_size * sizeof(float));
 
     for (int ii = min_pow; ii <= max_pow; ii++) {
-        int fft_size = round(pow(2, ii));
+        int fft_size = (int) round(pow(2, ii));
 
         //Create plan
         cufftHandle temp_plan;

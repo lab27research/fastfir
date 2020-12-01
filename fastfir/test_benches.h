@@ -212,7 +212,7 @@ void explore(char* output_csv,
         //Run processing and store results
         FFResult res;
         res.config = config_list[ii];
-        res.time_per_buffer = get_time_per_call<ff_type1>(mask_samps, input_samps, buffers_per_call, contiguous, 1000) / buffers_per_call;
+        res.time_per_buffer = get_time_per_call<ff_type1>(mask_samps, input_samps, buffers_per_call, contiguous, iterations) / buffers_per_call;
         res.time_flops_per_buffer = FastFir::getTimeDomainFLOPs(mask_samps, input_samps);
         res.freq_flops_per_buffer = FastFir::getFreqDomainFLOPs(mask_samps, input_samps);
         res.time_fps = res.time_flops_per_buffer / res.time_per_buffer;
@@ -240,16 +240,13 @@ double get_time_per_call(int mask_samps, int input_samps, int buffers_per_call, 
     HOST_MALLOC(&output, output_bytes);
 
     //Populate bogus mask and input
-    printf("Running memsets...\n");
     memset(mask, 0, 2 * mask_samps);
     memset(input, 0, 2 * input_samps * buffers_per_call * sizeof(float));
 
     //Create FIR Filter
-    printf("Creating filter...\n");
     ff_type ff1(mask, mask_samps, input_samps, buffers_per_call, contiguous);
 
     //This is where we need to add test bench
-    printf("Running filter...\n");
     Stopwatch sw;
     for (int ii = 0; ii < iterations; ii++) {
 
