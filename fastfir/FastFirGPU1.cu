@@ -92,12 +92,12 @@ void FastFirGPU1::run(float* input, float* output) {
     int num_blocks2 = getNumBlocks(tpb, left_transient_samps);
 
     //Calculate fft scaling
-    float scale = (float) (((double)1.0) / fft_size_);
+    float scale = (float)(((double)1.0) / fft_size_);
 
     //Output pointer movement depends on if we are using contiguous buffers
     float* h_output_ptr = output;
 
-    int num_proc_streams = (int) proc_streams_.size();
+    int num_proc_streams = (int)proc_streams_.size();
     for (int ii = 0; ii < buffers_per_call_; ii++) {
         int proc_stream_index = ii % num_proc_streams;
 

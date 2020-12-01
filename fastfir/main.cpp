@@ -7,7 +7,7 @@
 #include "datplot_utils.h"
 #include "test_benches.h"
 
-void nsight_compute_test() {
+void nsight_systems_test() {
     std::vector<FFConfig> configs;
     FFConfig cc;
 
@@ -46,10 +46,21 @@ void nsight_compute_test() {
     explore<FastFirGPU1>("nsight_compute_test.csv", configs);
 }
 
+void nsight_compute_test() {
+    int mask_samps = 256;
+    int input_samps = 1024;
+    int buffers_per_call = 10;
+    int iterations = 10;
+    double pc3 = get_time_per_call<FastFirGPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
+}
+
 int main() {
 
-    nsight_compute_test();
+    /*
+    * For debugging with NSight Systems
+    nsight_systems_test();
     return 1;
+    */
 
     //Unit test to determine cufft flops if not bound by H->D and D-> transfers
     test_cufft();
@@ -85,8 +96,8 @@ int main() {
     //Run "explore" command to test a variety of input sizes
     std::vector<FFConfig> configs;
     size_t target_memsize = round(0.25 * 1024 * 1024 * 1024);//Target around a gig total buffer size
-    int min_pow = 10;
-    int max_pow = 28;
+    int min_pow = 8;
+    int max_pow = 27;
     int explore_iterations = 4;
     //Note: Use for full results (ran overnight)
     //int min_pow = 8;
