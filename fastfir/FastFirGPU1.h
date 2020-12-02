@@ -7,6 +7,24 @@
 #include <vector>
 
 //Freq domain GPU implementation of the FastFir (overlap and add implementation)
+//
+//Utilizes one stream for H->D transfers and several streams for processing/D->H transfers
+//
+//Processing chain:
+// [Stream 1] H->D Transfer (sequentially for each input buffer)
+// [Stream 2] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// [Stream 3] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// [Stream 4] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// [Stream 5] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// ...
+//
+//All processing complex float
+//
+//Each processing stream synchronized to input transfer through "transfer1_done_events"
+//
+//For contiguous outputs, processing streams are synchronized with previous processing stream
+// so they can add in the results from the previous stream (using "kernels_done_events")
+
 class FastFirGPU1 : public FastFir
 {
 public:
@@ -30,7 +48,7 @@ private:
     //Transfer streams
     cudaStream_t transfer1_stream_;//For transfers H->D
 
-    //Streams/plan variables, one for each processing stream
+    //Streams/plan variables (one for each processing stream)
     std::vector<cudaStream_t> proc_streams_;//For all processing and D->H transfers
     std::vector<cufftHandle> cufft_plans_;
 

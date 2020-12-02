@@ -34,7 +34,7 @@ void test_cufft() {
         size_t workSize;
         checkCudaErrors(cufftMakePlan1d(temp_plan, fft_size, CUFFT_C2C, 1, &workSize));
 
-        //Run plan several times and time
+        //Run plan several times and clock total run time
         Stopwatch sw;
         for (int jj = 0; jj < iterations; jj++) {
             checkCudaErrors(cufftExecC2C(temp_plan, (cufftComplex*)buffer, (cufftComplex*)buffer, CUFFT_FORWARD));
