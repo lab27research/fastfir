@@ -57,7 +57,3 @@ private:
     std::vector<cudaEvent_t> kernels_done_events_;
 
 };
-
-__global__ void vectorCpxMpy(float* input1, float* input2, float* output, int NN);
-__global__ void vectorCpxScale(float* input1, float* output, float scale, int NN);
-__global__ void vectorCpxAdd(float* input1, float* input2, float* output, int NN);

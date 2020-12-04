@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cuda_utils.h"
+
 ////VECTORIZED MATH routines
 
 //Standard non-SSE complex multiply
@@ -11,3 +13,9 @@ inline void complex_madd(float aa, float bb, float cc, float dd, float* out) {
 
 ////NOISE GENERATION
 void generate_wgn_cf(double mean, double std, float* output, int output_samps);
+
+
+//half/bfloat16 type conversion
+void test_bfloat16_conversions();
+void cpxvec_float2bfloat16_scalar(float* input, nv_bfloat16* output, int num_samps);
+void cpxvec_float2bfloat16_avx(float* input, nv_bfloat16* output, int num_samps);

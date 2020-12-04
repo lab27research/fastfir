@@ -1,6 +1,8 @@
+
 #include "FastFirCPU1.h"
 #include "FastFirCPU2.h"
 #include "FastFirGPU1.h"
+#include "FastFirGPU2.h"
 #include "math_utils.h"
 #include "Stopwatch.h"
 #include "datplot_utils.h"
@@ -15,7 +17,7 @@ void nsight_compute_test();
 //FastFirCPU2 - CPU frequency domain implementation that uses FFTW (single threaded)
 //FastFirGPU1 - GPU frequency domain implementation that uses CUFFT
 //  -->All implementations use the Abstract Base Class: FastFir, which defines the
-//     interferface for the construction and run functions
+//     interferface for the constructor and run functions
 //
 //Several tests defined in test_benches.h/.cpp:
 //
@@ -27,6 +29,36 @@ void nsight_compute_test();
 //explore - Estimates GFLOPs achieved for each provided runtime config
 
 int main() {
+
+    /*
+    unit_test2<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
+    unit_test2<FastFirCPU2>("input2.csv", "mask2.csv", "output2.csv");
+    unit_test2<FastFirGPU1>("input3.csv", "mask3.csv", "output3.csv");
+    unit_test2<FastFirGPU2>("input4.csv", "mask4.csv", "output4.csv");
+    return 1;
+    */
+
+    /*
+    test_bfloat16_conversions();
+    return 1;
+    */
+
+    /*
+    test_conversion_performance();
+    return 1;
+    */
+
+    /*
+    for (int ii = 4; ii < 20; ii++) {
+        int mask_samps = pow(2, ii);
+        int input_samps = mask_samps * 4;
+        printf("Running for %i/%i\n", mask_samps, input_samps);
+        validate<FastFirGPU1, FastFirGPU2>(mask_samps,input_samps,10);
+    }
+    return 1;
+    */
+
+
 
     //For debugging with NSight Systems
     /*
@@ -43,16 +75,19 @@ int main() {
     ///All unit, validation, and performance tests
 
     //Unit test to determine cufft flops if not bound by H->D and D->H transfers
-    test_cufft();
+    //test_cufft();
 
+    /*
     //Run unit tests that can be verified externally
-    unit_test1<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
+    unit_test2<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
     unit_test2<FastFirCPU2>("input2.csv", "mask2.csv", "output2.csv");
     unit_test2<FastFirGPU1>("input3.csv", "mask3.csv", "output3.csv");
+    unit_test2<FastFirGPU2>("input4.csv", "mask4.csv", "output4.csv");
 
     //Compare implementations and understand output difference
     validate<FastFirCPU1, FastFirCPU2>(256, 1024, 9);
     validate<FastFirCPU2, FastFirGPU1>(256, 1024, 9);
+    validate<FastFirGPU1, FastFirGPU2>(256, 1024, 9);
 
     //Tests per-call performance (small workload)
     int mask_samps = 256;
@@ -62,22 +97,25 @@ int main() {
     double pc1 = get_time_per_call<FastFirCPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
     double pc2 = get_time_per_call<FastFirCPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
     double pc3 = get_time_per_call<FastFirGPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
-    printf("pc1=%f, pc2=%f, pc3=%f\n", pc1, pc2, pc3);
+    double pc4 = get_time_per_call<FastFirGPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    printf("Small buffer timings (us): %f/%f/%f/%f\n", pc1 * 1e6, pc2 * 1e6, pc3 * 1e6, pc4 * 1e6);
 
     //Test per-call performance (large workload)
     mask_samps = 128 * 1024;
     input_samps = 512 * 1024;
     buffers_per_call = 10;
     iterations = 10;
-    double pc4 = get_time_per_call<FastFirCPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
-    double pc5 = get_time_per_call<FastFirGPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
-    printf("pc4=%f, pc5=%f\n", pc4, pc5);
+    double pc5 = get_time_per_call<FastFirCPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    double pc6 = get_time_per_call<FastFirGPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    double pc7 = get_time_per_call<FastFirGPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
+    printf("Large buffer timings (us): %f/%f/%f\n", pc5 * 1e6, pc6 * 1e6, pc7 * 1e6);
+    */
 
 
     //Run "explore" command to test a variety of input sizes
     std::vector<FFConfig> configs;
     size_t target_memsize = round(0.25 * 1024 * 1024 * 1024);//Target around a gig total buffer size
-    int min_pow =12;
+    int min_pow = 12;
     int max_pow = 27;
     int explore_iterations = 4;
     //Note: Use for full results (ran overnight)
@@ -86,16 +124,17 @@ int main() {
     //int iterations = 10;
     for (int ii = min_pow; ii <= max_pow; ii++) {
         FFConfig cc;
-        cc.input_samps = (int) pow(2, ii);
+        cc.input_samps = (int)pow(2, ii);
         cc.mask_samps = cc.input_samps / 4;
-        cc.buffer_per_call = std::max(1, (int)round(target_memsize / (sizeof(float) * 2 * cc.input_samps)));
+        cc.buffer_per_call = (std::max)(1, (int)round(target_memsize / (sizeof(float) * 2 * cc.input_samps)));
 
-        cc.contiguous = false;
+        cc.contiguous = true;
         cc.iterations = explore_iterations;
         configs.push_back(cc);
     }
-    explore<FastFirGPU1>("explore2.csv", configs);
-    explore<FastFirCPU2>("explore1.csv", configs);
+    explore<FastFirGPU2>("explore_gpu2.csv", configs);
+    explore<FastFirGPU1>("explore_gpu1.csv", configs);
+    explore<FastFirCPU2>("explore_cpu2.csv", configs);
 
 }
 
@@ -135,7 +174,7 @@ void nsight_systems_test() {
     cc.iterations = 4;
     configs.push_back(cc);
 
-    explore<FastFirGPU1>("nsight_compute_test.csv", configs);
+    explore<FastFirGPU2>("nsight_compute_test.csv", configs);
 }
 
 void nsight_compute_test() {

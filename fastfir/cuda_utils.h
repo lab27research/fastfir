@@ -11,6 +11,13 @@
 ////Helper functions from samples
 #include "helper_cuda.h"
 
+////NVTX include
+#include "nvtx3/nvToolsExt.h"
+
+////Half type includes
+#include "cuda_fp16.h"
+#include "cuda_bf16.h"
+
 ////Memory allocation defines
 #define HOST_MALLOC(ptr,size) checkCudaErrors(cudaMallocHost(ptr,size))
 #define HOST_FREE(ptr) checkCudaErrors(cudaFreeHost(ptr));

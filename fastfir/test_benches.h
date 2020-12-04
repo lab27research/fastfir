@@ -10,13 +10,14 @@ using namespace std;
 
 //Unit tests
 void test_generate_wgn_cf();
+void test_conversion_performance();
 void test_cufft();
 
 //A unit test that processes a short sequence (that can be verified by hand)
 template <class ff_type>
 void unit_test1(string input_csv, string mask_csv, string output_csv)
 {
-    printf("Running unit test for %s, outputs at %s/%s/%s\n", typeid(ff_type).name(), input_csv.c_str(), mask_csv.c_str(), output_csv.c_str());
+    printf("Running unit_test1 for %s, outputs at %s/%s/%s\n", typeid(ff_type).name(), input_csv.c_str(), mask_csv.c_str(), output_csv.c_str());
 
     //Create mask/input/output buffers
     const int mask_samps = 2;
@@ -54,6 +55,9 @@ void unit_test1(string input_csv, string mask_csv, string output_csv)
 //Note: resulting correlation peaks should have magnitude equal to mask_samps
 template<class ff_type>
 void unit_test2(string input_csv, string mask_csv, string output_csv) {
+
+    printf("Running unit_test2 for %s, outputs at %s/%s/%s\n", typeid(ff_type).name(), input_csv.c_str(), mask_csv.c_str(), output_csv.c_str());
+
     int buffers_per_call = 10;
     int input_samps = 1024;
     int mask_samps = 256;
@@ -77,7 +81,7 @@ void unit_test2(string input_csv, string mask_csv, string output_csv) {
     }
 
     //Create FIR Filter and run algorithm
-    ff_type ff1(flipped_mask, mask_samps, input_samps, buffers_per_call, true);
+    ff_type ff1(flipped_mask, mask_samps, input_samps, buffers_per_call, false);
     ff1.run(input, output);
 
     //Write output files (should contain periodic correlation peaks)

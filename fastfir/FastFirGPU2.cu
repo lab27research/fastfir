@@ -1,12 +1,18 @@
-#include "FastFirGPU1.h"
+#include "FastFirGPU2.h"
+
+#include "math_utils.h"
 
 #include <algorithm>
 
-__global__ void vectorCpxMpy(float* input1, float* input2, float* output, int NN);
-__global__ void vectorCpxScale(float* input1, float* output, float scale, int NN);
-__global__ void vectorCpxAdd(float* input1, float* input2, float* output, int NN);
+namespace FFGPU2 {
+    __global__ void cpxHalf2Float(half* input, float* output, int NN);
+    __global__ void cpxbfloat162Float(nv_bfloat16* input, float* output, int NN);
+    __global__ void vectorCpxMpy(float* input1, float* input2, float* output, int NN);
+    __global__ void vectorCpxScale(float* input1, float* output, float scale, int NN);
+    __global__ void vectorCpxAdd(float* input1, float* input2, float* output, int NN);
+}
 
-FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
+FastFirGPU2::FastFirGPU2(float* mask, int mask_samps, int input_samps,
                          int buffers_per_call, bool contiguous)
     : FastFir(mask, mask_samps, input_samps, buffers_per_call, contiguous) {
 
@@ -14,9 +20,13 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     fft_size_ = FastFir::getFFTSize(mask_samps_, input_samps_);
 
     //Allocate device memory
-    size_t io_buffer_bytes = sizeof(float) * 2 * buffers_per_call_ * fft_size_;
+    size_t h_io_nv_bfloat16_buffer_bytes = sizeof(nv_bfloat16) * 2 * buffers_per_call * fft_size_;
+    size_t d_io_nv_bfloat16_buffer_bytes = sizeof(nv_bfloat16) * 2 * buffers_per_call_ * fft_size_;
+    size_t d_io_buffer_bytes = sizeof(float) * 2 * buffers_per_call_ * fft_size_;
     size_t mask_buffer_bytes = sizeof(float) * 2 * fft_size_;
-    DEVICE_MALLOC((void**)&d_io_buffer_, io_buffer_bytes);
+    HOST_MALLOC(&h_io_nv_bfloat16_buffer_, h_io_nv_bfloat16_buffer_bytes);
+    DEVICE_MALLOC((void**)&d_io_nv_bfloat16_buffer_, d_io_nv_bfloat16_buffer_bytes);
+    DEVICE_MALLOC((void**)&d_io_buffer_, d_io_buffer_bytes);
     DEVICE_MALLOC((void**)&d_mask_buffer_, mask_buffer_bytes);
 
     //Initialize mask buffer
@@ -49,7 +59,7 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     }
 
     //Execute plans at least once to ensure no first-call overhead
-    checkCudaErrors(cudaMemset(d_io_buffer_, 0, io_buffer_bytes));
+    checkCudaErrors(cudaMemset(d_io_buffer_, 0, d_io_buffer_bytes));
     for (int ii = 0; ii < (std::min)((int)cufft_plans_.size(), buffers_per_call_); ii++) {
         float* d_io_ptr = &d_io_buffer_[2 * ii * fft_size_];
         checkCudaErrors(cufftExecC2C(cufft_plans_[ii], (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
@@ -58,7 +68,7 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     cudaDeviceSynchronize();
 }
 
-FastFirGPU1::~FastFirGPU1() {
+FastFirGPU2::~FastFirGPU2() {
     //Destroy events
     for (int ii = 0; ii < buffers_per_call_; ii++) {
         checkCudaErrors(cudaEventDestroy(transfer1_done_events_[ii]));
@@ -74,10 +84,10 @@ FastFirGPU1::~FastFirGPU1() {
 
 }
 
-void FastFirGPU1::run(float* input, float* output) {
-    nvtxRangePushA("FastFirGPU1::run");
-    size_t input_bytes = sizeof(float) * 2 * input_samps_;
-    size_t non_input_bytes = sizeof(float) * 2 * (fft_size_ - input_samps_);
+void FastFirGPU2::run(float* input, float* output) {
+    nvtxRangePushA("FastFirGPU2::run");
+    size_t input_bytes = sizeof(nv_bfloat16) * 2 * input_samps_;
+    size_t non_input_bytes = sizeof(nv_bfloat16) * 2 * (fft_size_ - input_samps_);
     int output_samps_0sided = FastFir::getOutputSampsNoTransient(mask_samps_, input_samps_);
     int output_samps_1sided = FastFir::getOutputSamps1Sided(mask_samps_, input_samps_);
     int output_samps_2sided = FastFir::getOutputSamps2Sided(mask_samps_, input_samps_);
@@ -115,24 +125,35 @@ void FastFirGPU1::run(float* input, float* output) {
         //Choose cufft plans
         cufftHandle cufft_plan = cufft_plans_[proc_stream_index];
 
-        //Set buffer pointers
+        //Note: we are going to transfer the nv_bfloat16 samples to the end of the float buffer
+        nv_bfloat16* d_io_nv_bfloat16_ptr = &d_io_nv_bfloat16_buffer_[2 * ii * fft_size_];
         float* d_io_ptr = &d_io_buffer_[2 * ii * fft_size_];
-        float* h_input_ptr = &input[2 * ii * input_samps_];
 
-        //Transfer1 : H->D : Move input samples to device and zero pad
-        checkCudaErrors(cudaMemcpyAsync(d_io_ptr, h_input_ptr, input_bytes, cudaMemcpyHostToDevice, stream1));
-        checkCudaErrors(cudaMemsetAsync(&d_io_ptr[2 * input_samps_], 0, non_input_bytes, stream1));
+        //Convert input data from float to nv_bfloat16
+        nv_bfloat16* h_io_nv_bfloat16_ptr = &h_io_nv_bfloat16_buffer_[2 * ii * input_samps_];
+        float* h_io_ptr = &input[2 * ii * input_samps_];
+
+        nvtxRangePushA("cpu conversion");
+        cpxvec_float2bfloat16_avx(h_io_ptr, h_io_nv_bfloat16_ptr, input_samps_);
+        nvtxRangePop();
+
+        //Transfer1 : H->D : Move input samples to device and zero pad (transfers are nv_bfloat16 buffers)
+        checkCudaErrors(cudaMemcpyAsync(d_io_nv_bfloat16_ptr, h_io_nv_bfloat16_ptr, input_bytes, cudaMemcpyHostToDevice, stream1));
+        checkCudaErrors(cudaMemsetAsync(&d_io_nv_bfloat16_ptr[2 * input_samps_], 0, non_input_bytes, stream1));
         checkCudaErrors(cudaEventRecord(transfer1_done_events_[ii], stream1));
 
-        //Run fwd fft
+        //Run kernel to convert input from nv_bfloat16 to float
         checkCudaErrors(cudaStreamWaitEvent(stream2, transfer1_done_events_[ii]));
+        FFGPU2::cpxbfloat162Float << <num_blocks1, tpb, 0, stream2 >> > (d_io_nv_bfloat16_ptr, d_io_ptr, fft_size_);
+
+        //Run fwd fft
         checkCudaErrors(cufftExecC2C(cufft_plan, (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
 
         //Run cpx mpy/scaling kernel
-        vectorCpxMpy << <num_blocks1, tpb, 0, stream2 >> > (d_io_ptr, d_mask_buffer_, d_io_ptr, fft_size_);
+        FFGPU2::vectorCpxMpy << <num_blocks1, tpb, 0, stream2 >> > (d_io_ptr, d_mask_buffer_, d_io_ptr, fft_size_);
         checkCudaErrors(cudaPeekAtLastError());
 
-        vectorCpxScale << <num_blocks1, tpb, 0, stream2 >> > (d_io_ptr, d_io_ptr, scale, fft_size_);
+        FFGPU2::vectorCpxScale << <num_blocks1, tpb, 0, stream2 >> > (d_io_ptr, d_io_ptr, scale, fft_size_);
         checkCudaErrors(cudaPeekAtLastError());
 
         //Run rev fft
@@ -144,7 +165,7 @@ void FastFirGPU1::run(float* input, float* output) {
             if (ii != 0) {
                 checkCudaErrors(cudaStreamWaitEvent(stream2, kernels_done_events_[ii - 1]));
                 float* prev_d_io_ptr = &d_io_buffer_[2 * (ii - 1) * fft_size_];
-                vectorCpxAdd << <num_blocks2, tpb, 0, stream2 >> > (d_io_ptr, &prev_d_io_ptr[2 * output_samps_1sided], d_io_ptr, left_transient_samps);
+                FFGPU2::vectorCpxAdd << <num_blocks2, tpb, 0, stream2 >> > (d_io_ptr, &prev_d_io_ptr[2 * output_samps_1sided], d_io_ptr, left_transient_samps);
                 checkCudaErrors(cudaPeekAtLastError());
             }
         }
@@ -181,11 +202,11 @@ void FastFirGPU1::run(float* input, float* output) {
 
 
 //Allows override of number of streams
-void FastFirGPU1::setNumProcStreams(int num_streams) {
+void FastFirGPU2::setNumProcStreams(int num_streams) {
     initProcStreams(num_streams);
 }
 
-void FastFirGPU1::initProcStreams(int num_streams) {
+void FastFirGPU2::initProcStreams(int num_streams) {
     //De-allocate any currently created strams/plans
     if (proc_streams_.size() != 0) {
         for (int ii = 0; ii < proc_streams_.size(); ii++) {
@@ -211,61 +232,93 @@ void FastFirGPU1::initProcStreams(int num_streams) {
     }
 }
 
-//Vectorized complex multiply
-__global__ void vectorCpxMpy(float* input1, float* input2, float* output, int NN) {
-    //One dimensional grid/block configuration
-    int ii = blockIdx.x * blockDim.x + threadIdx.x;
+namespace FFGPU2 {
 
-    if (ii < NN) {
-        int offset = 2 * ii;
-        float* ptr1 = input1 + offset;//input1 location for this thread
-        float* ptr2 = input2 + offset;//input2 location for this thread
-        float* ptr3 = output + offset;//output location for this thread
+    __global__ void cpxHalf2Float(half* input, float* output, int NN) {
+        //One dimensional grid/block configuration
+        int ii = blockIdx.x * blockDim.x + threadIdx.x;
 
-        float aa = *(ptr1);
-        float bb = *(ptr1 + 1);
-        float cc = *(ptr2);
-        float dd = *(ptr2 + 1);
-
-        *(ptr3) = aa * cc - bb * dd;
-        *(ptr3 + 1) = aa * dd + bb * cc;
+        if (ii < NN) {
+            //Convert each complex value from float to half
+            int offset = 2 * ii;
+            half* ptr1 = input + offset;//input location for this thread
+            float* ptr2 = output + offset;//output location for this thread
+            *ptr2 = *ptr1;
+            *(ptr2 + 1) = *(ptr1 + 1);
+        }
     }
 
-}
+    __global__ void cpxbfloat162Float(nv_bfloat16* input, float* output, int NN) {
+        //One dimensional grid/block configuration
+        int ii = blockIdx.x * blockDim.x + threadIdx.x;
 
-__global__ void vectorCpxScale(float* input1, float* output, float scale, int NN) {
-    //One dimensional grid/block configuration
-    int ii = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (ii < NN) {
-        int offset = 2 * ii;
-        float* ptr1 = input1 + offset;//input1 location for this thread
-        float* ptr2 = output + offset;//output location for this thread
-
-        float aa = *(ptr1);
-        float bb = *(ptr1 + 1);
-
-        *(ptr2) = aa * scale;
-        *(ptr2 + 1) = bb * scale;
+        if (ii < NN) {
+            //Convert each complex value from float to half
+            int offset = 2 * ii;
+            nv_bfloat16* ptr1 = input + offset;//input location for this thread
+            float* ptr2 = output + offset;//output location for this thread
+            *ptr2 = *ptr1;
+            *(ptr2 + 1) = *(ptr1 + 1);
+        }
     }
-}
 
-__global__ void vectorCpxAdd(float* input1, float* input2, float* output, int NN) {
-    //One dimensional grid/block configuration
-    int ii = blockIdx.x * blockDim.x + threadIdx.x;
+    //Vectorized complex multiply
+    __global__ void vectorCpxMpy(float* input1, float* input2, float* output, int NN) {
+        //One dimensional grid/block configuration
+        int ii = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (ii < NN) {
-        int offset = 2 * ii;
-        float* ptr1 = input1 + offset;//input1 location for this thread
-        float* ptr2 = input2 + offset;//input2 location for this thread
-        float* ptr3 = output + offset;//output location for this thread
+        if (ii < NN) {
+            int offset = 2 * ii;
+            float* ptr1 = input1 + offset;//input1 location for this thread
+            float* ptr2 = input2 + offset;//input2 location for this thread
+            float* ptr3 = output + offset;//output location for this thread
 
-        float aa = *(ptr1);
-        float bb = *(ptr1 + 1);
-        float cc = *(ptr2);
-        float dd = *(ptr2 + 1);
+            float aa = *(ptr1);
+            float bb = *(ptr1 + 1);
+            float cc = *(ptr2);
+            float dd = *(ptr2 + 1);
 
-        *(ptr3) = aa + cc;
-        *(ptr3 + 1) = bb + dd;
+            *(ptr3) = aa * cc - bb * dd;
+            *(ptr3 + 1) = aa * dd + bb * cc;
+        }
+
     }
+
+    __global__ void vectorCpxScale(float* input1, float* output, float scale, int NN) {
+        //One dimensional grid/block configuration
+        int ii = blockIdx.x * blockDim.x + threadIdx.x;
+
+        if (ii < NN) {
+            int offset = 2 * ii;
+            float* ptr1 = input1 + offset;//input1 location for this thread
+            float* ptr2 = output + offset;//output location for this thread
+
+            float aa = *(ptr1);
+            float bb = *(ptr1 + 1);
+
+            *(ptr2) = aa * scale;
+            *(ptr2 + 1) = bb * scale;
+        }
+    }
+
+    __global__ void vectorCpxAdd(float* input1, float* input2, float* output, int NN) {
+        //One dimensional grid/block configuration
+        int ii = blockIdx.x * blockDim.x + threadIdx.x;
+
+        if (ii < NN) {
+            int offset = 2 * ii;
+            float* ptr1 = input1 + offset;//input1 location for this thread
+            float* ptr2 = input2 + offset;//input2 location for this thread
+            float* ptr3 = output + offset;//output location for this thread
+
+            float aa = *(ptr1);
+            float bb = *(ptr1 + 1);
+            float cc = *(ptr2);
+            float dd = *(ptr2 + 1);
+
+            *(ptr3) = aa + cc;
+            *(ptr3 + 1) = bb + dd;
+        }
+    }
+
 }
