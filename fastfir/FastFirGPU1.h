@@ -45,15 +45,11 @@ private:
     float* d_io_buffer_;
     float* d_mask_buffer_;
 
-    //Transfer streams
-    cudaStream_t transfer1_stream_;//For transfers H->D
-
     //Streams/plan variables (one for each processing stream)
-    std::vector<cudaStream_t> proc_streams_;//For all processing and D->H transfers
+    std::vector<cudaStream_t> proc_streams_;//Runs all processing (H->D, kernels, and D->H)
     std::vector<cufftHandle> cufft_plans_;
 
-    //Stream synchronization events (one for each buffer)
-    std::vector<cudaEvent_t> transfer1_done_events_;
+    //Stream synchronization events (one for each input buffer)
     std::vector<cudaEvent_t> kernels_done_events_;
 
 };

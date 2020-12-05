@@ -149,16 +149,16 @@ void validate(int mask_samps, int input_samps, int buffers_per_call) {
         float bb = output1[2 * ii + 1];
         float cc = aa - output2[2 * ii];
         float dd = bb - output2[2 * ii + 1];
-        accum1 += sqrt(aa * aa + bb * bb);//Sum power of first input
-        accum2 += sqrt(cc * cc + dd * dd);//Sum power of difference
+        accum1 += aa * aa + bb * bb;//Sum power of first input
+        accum2 += cc * cc + dd * dd;//Sum power of difference
     }
     for (int ii = 0; ii < ff3.getTotalOutputSamps(); ii++) {
         float aa = output3[2 * ii];
         float bb = output3[2 * ii + 1];
         float cc = aa - output4[2 * ii];
         float dd = bb - output4[2 * ii + 1];
-        accum3 += sqrt(aa * aa + bb * bb);//Sum power of first input
-        accum4 += sqrt(cc * cc + dd * dd);//Sum power of difference
+        accum3 += aa * aa + bb * bb;//Sum power of first input
+        accum4 += cc * cc + dd * dd;//Sum power of difference
     }
     printf("Non-contiguous SNR: %f\n", 10.0 * log10(accum1 / accum2));
     printf("Contiguous SNR: %f\n", 10.0 * log10(accum3 / accum4));
