@@ -28,5 +28,10 @@
 
 //Returns the max threads per block for the GPU at index gpu_index
 int getMaxThreadsPerBlock(int gpu_index);
+//Returns the max threads that can run concurrently on each SM
+int getMaxThreadsPerSM(int gpu_index);
+//Returns the highest number of threads per block that can still achieve 100% occupancy
+// (assuming only contraint is tpb)
+int getBestTPB(int gpu_index);
 //Returns the number of blocks necessary a ensure a minimum of total_threads
 int getNumBlocks(int tpb, int total_threads);

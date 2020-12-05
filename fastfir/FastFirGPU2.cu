@@ -97,7 +97,7 @@ void FastFirGPU2::run(float* input, float* output) {
     int left_transient_samps = output_samps_1sided - output_samps_0sided;
 
     ////Determine kernal parameters
-    int tpb = getMaxThreadsPerBlock(0);
+    int tpb = getBestTPB(0);
     //For kernels processing full fft size
     int num_blocks1 = getNumBlocks(tpb, fft_size_);
     //For kernels processing only transients

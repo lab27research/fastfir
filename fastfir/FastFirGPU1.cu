@@ -35,10 +35,10 @@ FastFirGPU1::FastFirGPU1(float* mask, int mask_samps, int input_samps,
     //Initialize transfer streams
     checkCudaErrors(cudaStreamCreate(&transfer1_stream_));
 
-    //Default to buffers_per_call_, with a max of 4
+    //Default to buffers_per_call_, with a max of 8
     //Note: each one must allocate their own FFT working buffers!
     // todo: recommend checking GPU memory and warning/limiting here
-    initProcStreams((std::min)(4, buffers_per_call_));
+    initProcStreams((std::min)(8, buffers_per_call_));
 
     //Create one event per processing buffer
     transfer1_done_events_.resize(buffers_per_call_);
@@ -87,7 +87,7 @@ void FastFirGPU1::run(float* input, float* output) {
     int left_transient_samps = output_samps_1sided - output_samps_0sided;
 
     ////Determine kernal parameters
-    int tpb = getMaxThreadsPerBlock(0);
+    int tpb = getBestTPB(0);
     //For kernels processing full fft size
     int num_blocks1 = getNumBlocks(tpb, fft_size_);
     //For kernels processing only transients
@@ -110,7 +110,9 @@ void FastFirGPU1::run(float* input, float* output) {
         //Note: the reason we need this stream synchronize is to make sure that this processing
         // stream does not call cudaStreamWaitEvent for more than one event.
         //It appears that you cannot que other kernels in between several waitevent calls
-        cudaStreamSynchronize(stream2);
+        if (contiguous_) {
+            cudaStreamSynchronize(stream2);
+        }
 
         //Choose cufft plans
         cufftHandle cufft_plan = cufft_plans_[proc_stream_index];
@@ -120,12 +122,12 @@ void FastFirGPU1::run(float* input, float* output) {
         float* h_input_ptr = &input[2 * ii * input_samps_];
 
         //Transfer1 : H->D : Move input samples to device and zero pad
-        checkCudaErrors(cudaMemcpyAsync(d_io_ptr, h_input_ptr, input_bytes, cudaMemcpyHostToDevice, stream1));
-        checkCudaErrors(cudaMemsetAsync(&d_io_ptr[2 * input_samps_], 0, non_input_bytes, stream1));
-        checkCudaErrors(cudaEventRecord(transfer1_done_events_[ii], stream1));
+        checkCudaErrors(cudaMemcpyAsync(d_io_ptr, h_input_ptr, input_bytes, cudaMemcpyHostToDevice, stream2));
+        checkCudaErrors(cudaMemsetAsync(&d_io_ptr[2 * input_samps_], 0, non_input_bytes, stream2));
+        //checkCudaErrors(cudaEventRecord(transfer1_done_events_[ii], stream1));
 
         //Run fwd fft
-        checkCudaErrors(cudaStreamWaitEvent(stream2, transfer1_done_events_[ii]));
+        //checkCudaErrors(cudaStreamWaitEvent(stream2, transfer1_done_events_[ii]));
         checkCudaErrors(cufftExecC2C(cufft_plan, (cufftComplex*)d_io_ptr, (cufftComplex*)d_io_ptr, CUFFT_FORWARD));
 
         //Run cpx mpy/scaling kernel
