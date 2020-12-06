@@ -57,7 +57,7 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CodeGeneration>compute_86,sm_86</CodeGeneration>
+      <CodeGeneration>compute_80,sm_80</CodeGeneration>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -80,7 +80,7 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <CodeGeneration>compute_86,sm_86</CodeGeneration>
+      <CodeGeneration>compute_80,sm_80</CodeGeneration>
       <FastMath>false</FastMath>
     </CudaCompile>
   </ItemDefinitionGroup>

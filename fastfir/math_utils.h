@@ -19,3 +19,4 @@ void generate_wgn_cf(double mean, double std, float* output, int output_samps);
 void test_bfloat16_conversions();
 void cpxvec_float2bfloat16_scalar(float* input, nv_bfloat16* output, int num_samps);
 void cpxvec_float2bfloat16_avx(float* input, nv_bfloat16* output, int num_samps);
+void cpxvec_bfloat162float_scalar(nv_bfloat16* input, float* output, int num_samps);

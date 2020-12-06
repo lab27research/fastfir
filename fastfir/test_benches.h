@@ -70,7 +70,7 @@ void unit_test2(string input_csv, string mask_csv, string output_csv) {
     HOST_MALLOC(&output, 2 * output_samps * buffers_per_call * sizeof(float));
 
     //Populate every inpt buffer with the same values
-    generate_wgn_cf(0.0, sqrt(2.0) / 2.0, input, input_samps);
+    generate_wgn_cf(0.0, 0.001*sqrt(2.0) / 2.0, input, input_samps);
     for (int ii = 1; ii < buffers_per_call; ii++) {
         memcpy(&input[2 * ii * input_samps], input, 2 * input_samps * sizeof(float));
     }

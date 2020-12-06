@@ -113,6 +113,16 @@ void cpxvec_float2bfloat16_avx(float* input, nv_bfloat16* output, int num_samps)
     cpxvec_float2bfloat16_scalar(in_ptr, out_ptr, leftovers);
 }
 
+void cpxvec_bfloat162float_scalar(nv_bfloat16* input, float* output, int num_samps) {
+    nv_bfloat16* ptr1 = input;
+    float* ptr2 = output;
+
+    for (int ii = 0; ii < num_samps; ii++) {
+        *(ptr2++) = *(ptr1++);
+        *(ptr2++) = *(ptr1++);
+    }
+}
+
 //Test that directly compares non-AVX vs AVX bfloat16 conversion functions
 void test_bfloat16_conversions() {
 

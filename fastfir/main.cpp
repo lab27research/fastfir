@@ -30,6 +30,7 @@ void nsight_compute_test();
 
 int main() {
 
+    //Useful for debugging new implementations
     /*
     unit_test2<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
     unit_test2<FastFirCPU2>("input2.csv", "mask2.csv", "output2.csv");
@@ -37,6 +38,17 @@ int main() {
     unit_test2<FastFirGPU2>("input4.csv", "mask4.csv", "output4.csv");
     return 1;
     */
+
+    /*
+    for (int ii = 3; ii < 19; ii++) {
+        int input_samps = pow(2, ii);
+        int mask_samps = input_samps / 4;
+        printf("Running for %i %i\n", mask_samps,input_samps);
+        validate<FastFirGPU1, FastFirGPU2>(mask_samps, input_samps, 1);
+    }
+    return 1;
+    */
+    
 
     /*
     test_bfloat16_conversions();
@@ -57,14 +69,15 @@ int main() {
     }
     return 1;
     */
+    
 
 
 
     //For debugging with NSight Systems
-    /*
+    
     nsight_systems_test();
     return 1;
-    */
+    
 
     //For debugging with NSight Compute
     /*
@@ -174,7 +187,7 @@ void nsight_systems_test() {
     cc.iterations = 4;
     configs.push_back(cc);
 
-    explore<FastFirGPU1>("nsight_systems_test.csv", configs);
+    explore<FastFirGPU2>("nsight_systems_test.csv", configs);
 }
 
 void nsight_compute_test() {
