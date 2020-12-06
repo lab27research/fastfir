@@ -289,7 +289,7 @@ void FastFirGPU2::run(float* input, float* output) {
     //Convert all output data from bfloat16 to float
     nvtxRangePushA("cpu output conversion");
     h_output_ptr = (nv_bfloat16*)h_bfloat16_buffer_;
-    cpxvec_bfloat162float_scalar(h_output_ptr, output, total_output_samps);
+    cpxvec_bfloat162float_avx(h_output_ptr, output, total_output_samps);
     nvtxRangePop();
 
     /*

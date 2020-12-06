@@ -54,6 +54,7 @@ int main() {
     test_bfloat16_conversions();
     return 1;
     */
+    
 
     /*
     test_conversion_performance();
@@ -61,7 +62,7 @@ int main() {
     */
 
     /*
-    for (int ii = 4; ii < 20; ii++) {
+    for (int ii = 4; ii < 16; ii++) {
         int mask_samps = pow(2, ii);
         int input_samps = mask_samps * 4;
         printf("Running for %i/%i\n", mask_samps, input_samps);
@@ -70,11 +71,11 @@ int main() {
     return 1;
     */
     
+    
 
 
 
     //For debugging with NSight Systems
-    
     nsight_systems_test();
     return 1;
     
@@ -187,6 +188,7 @@ void nsight_systems_test() {
     cc.iterations = 4;
     configs.push_back(cc);
 
+    explore<FastFirGPU1>("nsight_systems_test.csv", configs);
     explore<FastFirGPU2>("nsight_systems_test.csv", configs);
 }
 
