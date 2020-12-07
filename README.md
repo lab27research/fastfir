@@ -40,7 +40,7 @@ ff.run(input,output);
 ```
 
 
-Performance numbers on i5-7600:
+Performance numbers on i5-7600 (single-threaded):
 ```
 Running explore for class FastFirCPU2
 (mask size / input size / fft size / contiguous / buffers_per_call ... GFLOPS)
@@ -65,7 +65,7 @@ config: 8388608 33554432 1 0 4...4.316943 GFLOPs/sec
 config: 16777216 67108864 1 0 4...4.101851 GFLOPs/sec
 ```
 
-Performance numbers on RTX-3090:
+Performance numbers on RTX-3090 (PCIe Gen3):
 ```
 Running explore for class FastFirGPU1
 (mask size / input size / fft size / contiguous / buffers_per_call ... GFLOPS)
