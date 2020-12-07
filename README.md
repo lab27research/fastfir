@@ -13,7 +13,8 @@ Several implementations are derived from a common abtract class (FastFir):
 The interface is the same regardless.  All input/mask/output data is assumed to be interleaved 32-bit float values.
 
 ```C++
-FastFirGPU1(float* mask, int mask_samps, int input_samps, int buffers_per_call = 1, bool contiguous = false);
+FastFirGPU1(float* mask, int mask_samps, int input_samps,
+            int buffers_per_call = 1, bool contiguous = false);
 void run(float* input, float* output);
 
 //Set up input buffers
