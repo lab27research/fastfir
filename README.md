@@ -14,9 +14,9 @@ The interface is the same regardless of implementation:
 
 ```C++
 //Base class interface definitions
-FastFir(float* mask, int mask_samps, int input_samps,
+FastFir::FastFir(float* mask, int mask_samps, int input_samps,
         int buffers_per_call = 1, bool contiguous = false);
-void run(float* input, float* output);
+void FastFir::run(float* input, float* output);
 ```
 
 All input/mask/output data is assumed to be interleaved 32-bit float values:
