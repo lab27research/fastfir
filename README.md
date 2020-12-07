@@ -10,13 +10,18 @@ Several implementations are derived from a common abtract class (FastFir):
 * **FastFirGPU2** - GPU frequency domain implementation that uses half-precision CUFFT (work in progress)
 
 
-The interface is the same regardless.  All input/mask/output data is assumed to be interleaved 32-bit float values.
+The interface is the same regardless of implementation:
 
 ```C++
-FastFirGPU1(float* mask, int mask_samps, int input_samps,
-            int buffers_per_call = 1, bool contiguous = false);
+//Base class interface definitions
+FastFir(float* mask, int mask_samps, int input_samps,
+        int buffers_per_call = 1, bool contiguous = false);
 void run(float* input, float* output);
+```
 
+All input/mask/output data is assumed to be interleaved 32-bit float values:
+
+```C++
 //Set up input buffers
 int mask_samps = 1024;
 int input_samps = 4096;
