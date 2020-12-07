@@ -2,11 +2,11 @@
 
 Fastfir is a library that implements fast 1D complex convolution using both CPU and GPU implementations.
 
-Several implementations are derived from a common abtract class (FastFir):
-FastFirCPU1 - CPU time domain reference implementation
-FastFirCPU2 - CPU frequency domain implementation that uses FFTW (single threaded)
-FastFirGPU1 - GPU frequency domain implementation that uses CUFFT
-FastFirGPU2 - GPU frequency domain implementation that uses half-precision CUFFT (work in progress)
+Several implementations are derived from a common abtract class (FastFir):\n
+FastFirCPU1 - CPU time domain reference implementation\n
+FastFirCPU2 - CPU frequency domain implementation that uses FFTW (single threaded)\n
+FastFirGPU1 - GPU frequency domain implementation that uses CUFFT\n
+FastFirGPU2 - GPU frequency domain implementation that uses half-precision CUFFT (work in progress)\n
 
 The interface is the same regardless.  All input/mask/output data is assumed to be interleaved 32-bit float values.
 
