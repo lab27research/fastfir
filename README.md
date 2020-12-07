@@ -43,7 +43,7 @@ ff.run(input,output);
 Performance numbers on i5-7600 (single-threaded):
 ```
 Running explore for class FastFirCPU2
-(mask size / input size / contiguous / proc_iterations ... GFLOPS)
+(mask size / input size / buffers_per_call / contiguous / proc_iterations ... GFLOPS)
 config: 64 256 131072 0 4...21.462639 GFLOPs/sec
 config: 128 512 65536 0 4...23.890910 GFLOPs/sec
 config: 256 1024 32768 0 4...25.527554 GFLOPs/sec
@@ -68,7 +68,7 @@ config: 16777216 67108864 1 0 4...4.101851 GFLOPs/sec
 Performance numbers on RTX-3090 (PCIe Gen3):
 ```
 Running explore for class FastFirGPU1
-(mask size / input size / contiguous / proc_iterations ... GFLOPS)
+(mask size / input size / buffers_per_call / contiguous / proc_iterations ... GFLOPS)
 config: 64 256 131072 0 4...3.026979 GFLOPs/sec
 config: 128 512 65536 0 4...6.604298 GFLOPs/sec
 config: 256 1024 32768 0 4...13.681897 GFLOPs/sec
