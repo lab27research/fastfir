@@ -21,6 +21,8 @@
 
 #include <immintrin.h>
 
+//Utilities useful for AVX debugging
+
 void print_packed_bfloat16s(__m256i reg);
 
 void print_packed_chars(__m256i reg);

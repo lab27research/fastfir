@@ -32,7 +32,7 @@ void test_generate_wgn_cf();
 void test_conversion_performance();
 void test_cufft();
 
-//A unit test that processes a short sequence (that can be verified by hand)
+//A unit test that processes a short sequence (and can be verified by hand)
 template <class ff_type>
 void unit_test1(string input_csv, string mask_csv, string output_csv)
 {
@@ -89,7 +89,7 @@ void unit_test2(string input_csv, string mask_csv, string output_csv) {
     HOST_MALLOC(&output, 2 * output_samps * buffers_per_call * sizeof(float));
 
     //Populate every inpt buffer with the same values
-    generate_wgn_cf(0.0, 0.001*sqrt(2.0) / 2.0, input, input_samps);
+    generate_wgn_cf(0.0, sqrt(2.0) / 2.0, input, input_samps);
     for (int ii = 1; ii < buffers_per_call; ii++) {
         memcpy(&input[2 * ii * input_samps], input, 2 * input_samps * sizeof(float));
     }
@@ -191,8 +191,7 @@ void validate(int mask_samps, int input_samps, int buffers_per_call) {
     HOST_FREE(output4);
 }
 
-//Test varies processing parameters for passed FastFir and writes a summary output csv outlining
-// performance metrics
+//Structure used to pass config parameters to explore() function
 struct FFConfig {
     int mask_samps;
     int input_samps;
@@ -201,6 +200,7 @@ struct FFConfig {
     int iterations;
 };
 
+//Structure used to store results internally in explore() function
 struct FFResult {
     //Input parameters
     FFConfig config;
@@ -216,6 +216,8 @@ struct FFResult {
 
 #include "datplot_utils.h"
 
+//Test that varies processing parameters for passed FastFir and writes a summary output csv outlining
+// performance metrics
 template <class ff_type1>
 void explore(char* output_csv,
              vector<FFConfig>& config_list) {
@@ -249,6 +251,8 @@ void explore(char* output_csv,
     dataplot_write_ffresults(output_csv, results);
 }
 
+//Test that runs the provided configuration 'iterations' times and esimates
+// the per-call runtime (in seconds)
 template<class ff_type>
 double get_time_per_call(int mask_samps, int input_samps, int buffers_per_call, bool contiguous, int iterations) {
     int output_samps = FastFir::getOutputSamps2Sided(mask_samps, input_samps);

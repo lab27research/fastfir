@@ -34,6 +34,7 @@ void nsight_compute_test();
 //FastFirCPU1 - CPU time domain reference implementation
 //FastFirCPU2 - CPU frequency domain implementation that uses FFTW (single threaded)
 //FastFirGPU1 - GPU frequency domain implementation that uses CUFFT
+//FastFirGPU2 - GPU frequency domain implementation that uses half-precision CUFFT (work in progress)
 //  -->All implementations use the Abstract Base Class: FastFir, which defines the
 //     interferface for the constructor and run functions
 //
@@ -57,6 +58,7 @@ int main() {
     return 1;
     */
 
+    //Useful for cross-validation across lots of different sizes
     /*
     for (int ii = 3; ii < 19; ii++) {
         int input_samps = pow(2, ii);
@@ -67,31 +69,16 @@ int main() {
     return 1;
     */
     
-
+    //Debugging for CPU float->bfloat16->float conversion
     /*
     test_bfloat16_conversions();
     return 1;
     */
-    
 
+    //Unit test to determine cufft flops if not bound by H->D and D->H transfers
     /*
-    test_conversion_performance();
-    return 1;
+    test_cufft();
     */
-
-    /*
-    for (int ii = 4; ii < 16; ii++) {
-        int mask_samps = pow(2, ii);
-        int input_samps = mask_samps * 4;
-        printf("Running for %i/%i\n", mask_samps, input_samps);
-        validate<FastFirGPU1, FastFirGPU2>(mask_samps,input_samps,10);
-    }
-    return 1;
-    */
-    
-    
-
-
 
     //For debugging with NSight Systems
     nsight_systems_test();
@@ -105,10 +92,6 @@ int main() {
     */
 
     ///All unit, validation, and performance tests
-
-    //Unit test to determine cufft flops if not bound by H->D and D->H transfers
-    //test_cufft();
-
     
     //Run unit tests that can be verified externally
     unit_test2<FastFirCPU1>("input1.csv", "mask1.csv", "output1.csv");
@@ -141,7 +124,6 @@ int main() {
     double pc6 = get_time_per_call<FastFirGPU1>(mask_samps, input_samps, buffers_per_call, true, iterations);
     double pc7 = get_time_per_call<FastFirGPU2>(mask_samps, input_samps, buffers_per_call, true, iterations);
     printf("Large buffer timings (us): %f/%f/%f\n", pc5 * 1e6, pc6 * 1e6, pc7 * 1e6);
-    
 
 
     //Run "explore" command to test a variety of input sizes

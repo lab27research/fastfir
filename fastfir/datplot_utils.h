@@ -25,6 +25,10 @@
 
 #include "test_benches.h"
 
+//Datplot is free plotting software useful for quick debugging.  It ingests csv files and
+// is able to perform basic 2D plotting
+//The following functions generate files that can be easily ingested into Datplot
+
 //Write a Complex Float csv file that can be easily plotted with datplot
 //Columns: index,time,real,imag,mag,phase
 void datplot_write_cf(char* filename, float* data, int data_samps, double xstart = 0.0, double xdelta = 1.0);

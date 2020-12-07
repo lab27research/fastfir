@@ -30,11 +30,10 @@
 //Utilizes one stream for H->D transfers and several streams for processing/D->H transfers
 //
 //Processing chain:
-// [Stream 1] H->D Transfer (sequentially for each input buffer)
-// [Stream 2] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
-// [Stream 3] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
-// [Stream 4] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
-// [Stream 5] cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// [Stream 1] H->D Transfer, cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// [Stream 2] H->D Transfer, cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// [Stream 3] H->D Transfer, cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
+// [Stream 4] H->D Transfer, cufft Forward FFT, custom cpx mpy + scaling, cufft Inverse FFT, D->H Transfer
 // ...
 //
 //All processing complex float

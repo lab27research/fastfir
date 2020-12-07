@@ -19,6 +19,8 @@
 
 #pragma once
 
+//A simple class for estimating runtimes
+
 class Stopwatch
 {
 public:

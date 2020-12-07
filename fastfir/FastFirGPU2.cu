@@ -142,7 +142,7 @@ void FastFirGPU2::run(float* input, float* output) {
     //Output pointer movement depends on if we are using contiguous buffers
     //Note: with half types we are going to memcpy to second half of float output buffer
     int total_output_samps = FastFir::getTotalOutputSamps();
-    nv_bfloat16* h_output_ptr = (nv_bfloat16*)h_bfloat16_buffer_;
+    nv_bfloat16* h_output_ptr = (nv_bfloat16*) h_bfloat16_buffer_;
 
     int num_proc_streams = (int)proc_streams_.size();
     for (int ii = 0; ii < buffers_per_call_; ii++) {
@@ -165,6 +165,7 @@ void FastFirGPU2::run(float* input, float* output) {
         cpxvec_float2bfloat16_avx(h_io_ptr, h_io_nv_bfloat16_ptr, input_samps_);
         nvtxRangePop();
 
+        //Overflow debug
         /*
         printf("float/nv_float16=%f/%f\n", h_io_ptr[0], (float)h_io_nv_bfloat16_ptr[0]);
         printf("float/nv_float16=%f/%f\n", h_io_ptr[1], (float)h_io_nv_bfloat16_ptr[1]);
@@ -173,7 +174,7 @@ void FastFirGPU2::run(float* input, float* output) {
         */
 
 
-        //DEBUG
+        //Overflow debug
         /*
         nv_bfloat16* bfloat16_data;
         half* half_data;
@@ -188,6 +189,8 @@ void FastFirGPU2::run(float* input, float* output) {
         //Convert from bfloat16 to half
         FFGPU2::cpxBfloat162Half << <num_blocks1, tpb, 0, proc_stream >> > (d_io_nv_bfloat16_ptr, d_io_ptr, fft_size_);
 
+
+        //Overflow debug
         /*
         cudaMemcpy(bfloat16_data, d_io_nv_bfloat16_ptr, 4 * sizeof(nv_bfloat16), cudaMemcpyDeviceToHost);
         cudaMemcpy(half_data, d_io_ptr, 4 * sizeof(half), cudaMemcpyDeviceToHost);
@@ -201,6 +204,7 @@ void FastFirGPU2::run(float* input, float* output) {
         //Run fwd fft
         checkCudaErrors(cufftXtExec(proc_plan, (void*)d_io_ptr, (void*)d_io_ptr, CUFFT_FORWARD));
 
+        //Overflow debug
         /*
         cudaMemcpy(half_data, d_io_ptr, 4 * sizeof(half), cudaMemcpyDeviceToHost);
         printf("half0=%f\n", (float)half_data[0]);
@@ -213,6 +217,7 @@ void FastFirGPU2::run(float* input, float* output) {
         FFGPU2::vectorCpxScale << <num_blocks1, tpb, 0, proc_stream >> > (d_io_ptr, d_io_ptr, scale, fft_size_);
         checkCudaErrors(cudaPeekAtLastError());
 
+        //Overflow debug
         /*
         cudaMemcpy(half_data, d_io_ptr, 4 * sizeof(half), cudaMemcpyDeviceToHost);
         printf("half1_input=%f\n", (float)half_data[0]);
@@ -221,6 +226,7 @@ void FastFirGPU2::run(float* input, float* output) {
         printf("half1_input=%f\n", (float)half_data[3]);
         */
 
+        //Overflow debug
         /*
         cudaMemcpy(half_data, d_mask_buffer_, 4 * sizeof(half), cudaMemcpyDeviceToHost);
         printf("half1_mask=%f\n", (float)half_data[0]);
@@ -233,6 +239,7 @@ void FastFirGPU2::run(float* input, float* output) {
         FFGPU2::vectorCpxMpy << <num_blocks1, tpb, 0, proc_stream >> > (d_io_ptr, d_mask_buffer_, d_io_ptr, fft_size_);
         checkCudaErrors(cudaPeekAtLastError());
         
+        //Overflow debug
         /*
         cudaMemcpy(half_data, d_io_ptr, 4 * sizeof(half), cudaMemcpyDeviceToHost);
         printf("half2=%f\n", (float)half_data[0]);
@@ -245,6 +252,7 @@ void FastFirGPU2::run(float* input, float* output) {
         //Run rev fft
         checkCudaErrors(cufftXtExec(proc_plan, (void*)d_io_ptr, (void*)d_io_ptr, CUFFT_INVERSE));
 
+        //Overflow debug
         /*
         cudaMemcpy(half_data, d_io_ptr, 4 * sizeof(half), cudaMemcpyDeviceToHost);
         printf("half3=%f\n", (float)half_data[0]);
@@ -269,6 +277,7 @@ void FastFirGPU2::run(float* input, float* output) {
         //Convert from half to bfloat16
         FFGPU2::cpxHalf2Bfloat16 << <num_blocks1, tpb, 0, proc_stream >> > (d_io_ptr, d_io_nv_bfloat16_ptr, fft_size_);
 
+        //Overflow debug
         /*
         cudaMemcpy(half_data, d_io_ptr, 4 * sizeof(half), cudaMemcpyDeviceToHost);
         cudaMemcpy(bfloat16_data, d_io_nv_bfloat16_ptr, 4 * sizeof(half), cudaMemcpyDeviceToHost);
@@ -300,17 +309,28 @@ void FastFirGPU2::run(float* input, float* output) {
             }
 
         }
+
+        if (ii == num_proc_streams - 1) {
+            //Overlap CPU output conversions
+            for (int jj = 0; jj < num_proc_streams; jj++) {
+                cudaStreamSynchronize(proc_streams_[jj]);
+                
+            }
+        }
     }
 
     //Synchronize all streams
     cudaDeviceSynchronize();
 
     //Convert all output data from bfloat16 to float
+    //Note: todo - attempt to add this conversion incrementally in between CUDA API submission
+    // (overlap CPU conversion with GPU processing)
     nvtxRangePushA("cpu output conversion");
-    h_output_ptr = (nv_bfloat16*)h_bfloat16_buffer_;
+    h_output_ptr = h_bfloat16_buffer_;
     cpxvec_bfloat162float_avx(h_output_ptr, output, total_output_samps);
     nvtxRangePop();
 
+    //Overflow debug
     /*
     printf("nv_float16/float=%f/%f\n", (float)h_output_ptr[0], output[0]);
     printf("nv_float16/float=%f/%f\n", (float)h_output_ptr[1], output[1]);
