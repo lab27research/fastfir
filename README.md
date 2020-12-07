@@ -15,7 +15,7 @@ The interface is the same regardless of implementation:
 ```C++
 //Base class interface definitions
 FastFir::FastFir(float* mask, int mask_samps, int input_samps,
-        int buffers_per_call = 1, bool contiguous = false);
+                 int buffers_per_call = 1, bool contiguous = false);
 void FastFir::run(float* input, float* output);
 ```
 
