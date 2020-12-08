@@ -21,6 +21,34 @@
 
 #include "cuda_utils.h"
 
+//Performs a complex multiply assuming a single
+// interleaved complex sample in each array
+template<class T>
+inline void cpxmpy(T* input1, T* input2, T* output) {
+    T aa = *(input1);
+    T bb = *(input1 + 1);
+    T cc = *(input2);
+    T dd = *(input2 + 1);
+
+    //(aa+bbj)*(cc+ddj) = (aa*cc - bb*dd) + (aa*dd + bb*cc)j
+    *(output) = (aa * cc - bb * dd);
+    *(output + 1) = (aa * dd + bb * cc);
+}
+
+//Performs a complex add assuming a single
+// interleaved complex sample in each array
+template<class T>
+inline void cpxadd(T* input1, T* input2, T* output) {
+    T aa = *(input1);
+    T bb = *(input1 + 1);
+    T cc = *(input2);
+    T dd = *(input2 + 1);
+
+    //(aa+bbj) + (cc+ddj) = (aa+cc) + (bb+dd)j
+    *(output) = (aa + cc);
+    *(output + 1) = (bb + dd);
+}
+
 //Standard non-SSE complex multiply
 //(aa+bbj)*(cc+ddj) = (aa*cc-bb*dd) + j(aa*dd + bb*cc)
 inline void complex_madd(float aa, float bb, float cc, float dd, float* out) {
