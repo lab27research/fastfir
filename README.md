@@ -1,6 +1,6 @@
-# Fastfir
+# FastFir
 
-Fastfir is a library that implements fast 1D complex convolution using both CPU and GPU implementations.
+FastFir is a library that implements fast 1D complex convolution using both CPU and GPU implementations.  It is very much a work in progress and no stable releases have been made.
 
 
 Several implementations are derived from a common abtract class (FastFir):
