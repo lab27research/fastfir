@@ -67,3 +67,24 @@ void cpxvec_float2bfloat16_avx(float* input, nv_bfloat16* output, int num_samps)
 //Note: input and output must be disjoint for bfloat16->float conversions
 void cpxvec_bfloat162float_scalar(nv_bfloat16* input, float* output, int num_samps);
 void cpxvec_bfloat162float_avx(nv_bfloat16* input, float* output, int num_samps);
+
+//Tool useful for comparing two complex signals
+template<class T>
+double snrdiff(T* input1, T* input2, int input_samps) {
+    double accum1 = 0.0;
+    double accum2 = 0.0;
+    for (int ii = 0; ii < input_samps; ii++) {
+        T aa = *input1++;
+        T bb = *input1++;
+        T cc = aa - *input2++;
+        T dd = bb - *input2++;
+
+        //Accumulate power of first signal
+        accum1 += (aa * aa + bb * bb);
+
+        //Accumulate power of difference
+        accum2 += (cc * cc + dd * dd);
+    }
+
+    return 10.0 * log10(accum1 / accum2);
+}
