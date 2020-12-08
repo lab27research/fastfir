@@ -81,8 +81,10 @@ int main() {
     */
 
     //For debugging with NSight Systems
+    /*
     nsight_systems_test();
     return 1;
+    */
     
 
     //For debugging with NSight Compute
@@ -128,9 +130,9 @@ int main() {
 
     //Run "explore" command to test a variety of input sizes
     std::vector<FFConfig> configs;
-    size_t target_memsize = round(0.25 * 1024 * 1024 * 1024);//Target around a gig total buffer size
-    int min_pow = 12;
-    int max_pow = 27;
+    size_t target_memsize = round(0.25 * 1024 * 1024 * 1024);//Target around 250MB total buffer size
+    int min_pow = 8;
+    int max_pow = 26;
     int explore_iterations = 4;
     //Note: Use for full results (ran overnight)
     //int min_pow = 8;
@@ -183,7 +185,7 @@ void nsight_systems_test() {
     //Run one large sized, contiguous
     cc.input_samps = 1 * 1024 * 1024;
     cc.mask_samps = cc.input_samps / 4;
-    cc.buffer_per_call = 10;
+    cc.buffer_per_call = 20;
     cc.contiguous = true;
     cc.iterations = 4;
     configs.push_back(cc);

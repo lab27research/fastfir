@@ -81,10 +81,10 @@ FastFirGPU2::FastFirGPU2(float* mask, int mask_samps, int input_samps,
     //Free temporary buffer
     DEVICE_FREE(temp_mask);
 
-    //Default to buffers_per_call_, with a max of 4
+    //Default to buffers_per_call_, with a max of 8
     //Note: each one must allocate their own FFT working buffers!
     // todo: recommend checking GPU memory and warning/limiting here
-    initProcStreams((std::min)(4, buffers_per_call_));
+    initProcStreams((std::min)(8, buffers_per_call_));
 
     //Create one event per processing buffer
     kernels_done_events_.resize(buffers_per_call_);
